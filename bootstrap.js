@@ -49,6 +49,7 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
       'features/collection-bulk.js',
       'features/gif-finder.js',
       'features/collection-discard.js',
+      'features/extra-tools.js',
       'features/app.js',
       'content.js'
     ];
