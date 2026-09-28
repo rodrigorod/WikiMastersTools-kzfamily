@@ -10,6 +10,8 @@
         premiumCards: true,
         wikipediaButtons: true,
         missingImages: true,
+        copyCardImage: true,
+        hideCardStats: true,
         collectionPrices: true,
         marketplacePrice: true,
         globalCollectionPrice: true,
@@ -23,7 +25,9 @@
         pullStats: true,
         openAll: true,
         autoOpen: true,
-        tradeValues: true
+        tradeValues: true,
+        tradePreviews: true,
+        notificationSound: true
       });
 
       const categories = [
@@ -33,7 +37,9 @@
           items: [
             ['premiumCards', 'Design full-art / holographique', 'Remplace le rendu WikiMasters par le design amélioré avec ratio et couleurs adaptés.'],
             ['wikipediaButtons', 'Bouton Wikipédia', 'Ajoute le raccourci W sur les cartes.'],
-            ['missingImages', 'Images manquantes via Wikimedia', 'Cherche une illustration Wikimedia Commons quand WikiMasters n’en fournit pas.']
+            ['missingImages', 'Images manquantes via Wikimedia', 'Cherche une illustration Wikimedia Commons quand WikiMasters n’en fournit pas.'],
+            ['copyCardImage', 'Copier la carte comme image', 'Ajoute dans la fiche d’une carte un bouton pour copier son rendu en PNG.'],
+            ['hideCardStats', 'Masquer ATK / DEF', 'Masque indépendamment les valeurs d’attaque et de défense sur les cartes et dans leur fiche.']
           ]
         },
         {
@@ -65,7 +71,15 @@
           title: 'Échanges',
           description: 'Aides à l’estimation des trades.',
           items: [
-            ['tradeValues', 'Valeur des échanges', 'Ajoute le prix de chaque carte et le total de chaque côté d’un échange.']
+            ['tradeValues', 'Valeur des échanges', 'Ajoute le prix de chaque carte et le total de chaque côté d’un échange.'],
+            ['tradePreviews', 'Prévisualisation complète des cartes', 'Remplace les noms tronqués des offres par des mini-cartes avec image, rareté et titre complet.']
+          ]
+        },
+        {
+          title: 'Confort',
+          description: 'Petites améliorations de navigation.',
+          items: [
+            ['notificationSound', 'Son de notification', 'Joue un petit son quand le compteur de notifications augmente.']
           ]
         }
       ];
