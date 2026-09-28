@@ -45,6 +45,7 @@
     'collectionBulk',
     'gifFinder',
     'collectionDiscard',
+    'extraTools',
     'app'
   ];
 
@@ -126,6 +127,7 @@
   runtime.collectionBulk = featureRegistry.collectionBulk.create(runtime);
   runtime.gifFinder = featureRegistry.gifFinder.create(runtime);
   runtime.collectionDiscard = featureRegistry.collectionDiscard.create(runtime);
+  runtime.extraTools = featureRegistry.extraTools.create(runtime);
   runtime.app = featureRegistry.app.create(runtime);
 
   runtime.app.startObserver();
