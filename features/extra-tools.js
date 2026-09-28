@@ -776,11 +776,13 @@
           }
         }
 
-        // Description : reprend la couleur, police et zone réelles du DOM.
+        // Description : le line-clamp/flex du site peut reporter une hauteur
+        // minuscule dans getBoundingClientRect(). On recalcule donc la vraie
+        // zone disponible entre le titre/prix et les stats.
         const description = descriptionElement?.textContent?.trim() || '';
         const descriptionRect = relativeRect(descriptionElement, cardRect);
 
-        if (description && descriptionRect) {
+        if (description && descriptionElement) {
           const style = getComputedStyle(descriptionElement);
           const fontSize = Math.max(
             8,
@@ -791,9 +793,48 @@
             Number.parseFloat(style.lineHeight) || fontSize * 1.22
           );
           const family = style.fontFamily || 'sans-serif';
+
+          const titleBottom = titleRect
+            ? titleRect.y + titleRect.height
+            : height * 0.50;
+
+          const averageRect =
+            averageElement && averageElement.offsetParent !== null
+              ? relativeRect(averageElement, cardRect)
+              : null;
+
+          const contentStart = Math.max(
+            descriptionRect?.y || 0,
+            titleBottom + 5,
+            averageRect ? averageRect.y + averageRect.height + 5 : 0
+          );
+
+          const attackIconForLayout = card.querySelector('svg.lucide-swords');
+          const defenseIconForLayout = card.querySelector('svg.lucide-shield');
+          const statsRow =
+            attackIconForLayout?.closest('div[class*="border-t"]') ||
+            defenseIconForLayout?.closest('div[class*="border-t"]') ||
+            attackIconForLayout?.closest('div[class*="justify-between"]') ||
+            defenseIconForLayout?.closest('div[class*="justify-between"]');
+
+          const statsRect = relativeRect(statsRow, cardRect);
+          const contentBottom = statsRect?.y || (height - 12);
+          const availableHeight = Math.max(
+            lineHeight,
+            contentBottom - contentStart - 5
+          );
+
+          const descriptionX = descriptionRect?.x || 12;
+          const descriptionWidth = Math.max(
+            40,
+            descriptionRect?.width || (width - descriptionX - 12)
+          );
+
+          // La carte WikiMasters affiche jusqu'à 10 lignes. On garde la même
+          // limite, mais on utilise toute la hauteur réellement disponible.
           const maxLines = Math.max(
             1,
-            Math.floor(descriptionRect.height / lineHeight)
+            Math.min(10, Math.floor(availableHeight / lineHeight))
           );
 
           context.save();
@@ -807,15 +848,15 @@
           const lines = wrapCanvasText(
             context,
             description,
-            descriptionRect.width,
+            descriptionWidth,
             maxLines
           );
 
           lines.forEach((line, index) => {
             context.fillText(
               line,
-              descriptionRect.x,
-              descriptionRect.y + index * lineHeight
+              descriptionX,
+              contentStart + index * lineHeight
             );
           });
           context.restore();
