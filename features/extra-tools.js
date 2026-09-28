@@ -357,37 +357,71 @@
         setCopyState(button, 'idle');
 
         button.addEventListener('pointerdown', (event) => event.stopPropagation());
-        button.addEventListener('click', (event) => {
+        button.addEventListener('click', async (event) => {
           event.preventDefault();
           event.stopPropagation();
 
           if (!event.isTrusted || button.dataset.wmCopyState === 'busy') return;
 
-          if (
-            typeof ClipboardItem !== 'function' ||
-            typeof navigator.clipboard?.write !== 'function'
-          ) {
+          setCopyState(button, 'busy');
+
+          try {
+            const blob = await snapshotCard(card);
+            const dataUrl = await blobToDataUrl(blob);
+            const requestId =
+              'wm-copy-' +
+              Date.now().toString(36) +
+              '-' +
+              Math.random().toString(36).slice(2, 9);
+
+            const result = await new Promise((resolve, reject) => {
+              const timeout = setTimeout(() => {
+                window.removeEventListener('message', onMessage);
+                reject(new Error('La copie a expiré'));
+              }, 8000);
+
+              function onMessage(messageEvent) {
+                if (messageEvent.source !== window) return;
+
+                const message = messageEvent.data;
+                if (
+                  !message ||
+                  message.source !== 'wm-average-extension' ||
+                  message.type !== 'copy-card-image-result' ||
+                  message.requestId !== requestId
+                ) {
+                  return;
+                }
+
+                clearTimeout(timeout);
+                window.removeEventListener('message', onMessage);
+
+                if (message.ok) {
+                  resolve(true);
+                } else {
+                  reject(new Error(message.error || 'Copie refusée'));
+                }
+              }
+
+              window.addEventListener('message', onMessage);
+              window.postMessage({
+                source: 'wm-average-page',
+                type: 'copy-card-image',
+                requestId,
+                dataUrl
+              }, '*');
+            });
+
+            if (result) {
+              setCopyState(button, 'done');
+            }
+          } catch (error) {
+            console.error('[WM Average] copie image impossible', error);
             setCopyState(button, 'failed');
-            setTimeout(() => setCopyState(button, 'idle'), 1800);
-            return;
+            button.title = 'Échec : ' + String(error?.message || error);
           }
 
-          setCopyState(button, 'busy');
-          const pngPromise = snapshotCard(card);
-
-          navigator.clipboard.write([
-            new ClipboardItem({ 'image/png': pngPromise })
-          ]).then(
-            () => {
-              setCopyState(button, 'done');
-              setTimeout(() => setCopyState(button, 'idle'), 1800);
-            },
-            (error) => {
-              console.debug('[WM Average] copie image indisponible', error);
-              setCopyState(button, 'failed');
-              setTimeout(() => setCopyState(button, 'idle'), 1800);
-            }
-          );
+          setTimeout(() => setCopyState(button, 'idle'), 1800);
         });
 
         card.append(button);
