@@ -1,8 +1,11 @@
 {
   "manifest_version": 3,
   "name": "WikiMasters - Prix moyen collection",
-  "version": "4.16.0",
-  "description": "Outils WikiMasters configurables : prix moyens, défausse par prix, collection, cartes GIF, échanges, paquets, cartes full-art, Wikipédia et vue compacte.",
+  "version": "4.16.1",
+  "description": "Outils WikiMasters configurables : prix moyens, collection, échanges, paquets, cartes full-art, Wikipédia et vue compacte.",
+  "permissions": [
+    "clipboardWrite"
+  ],
   "host_permissions": [
     "https://www.wiki-masters.com/*"
   ],
