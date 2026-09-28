@@ -364,42 +364,111 @@
       }
 
       function wrapCanvasText(context, text, maxWidth, maxLines = Infinity) {
-        const words = String(text || '').trim().split(/\s+/).filter(Boolean);
-        if (!words.length) return [];
+        const paragraphs = String(text || '')
+          .replace(/\r\n?/g, '\n')
+          .split('\n');
 
         const lines = [];
-        let line = '';
+        let truncated = false;
 
-        for (const word of words) {
-          const next = line ? `${line} ${word}` : word;
+        for (let paragraphIndex = 0; paragraphIndex < paragraphs.length; paragraphIndex += 1) {
+          const words = paragraphs[paragraphIndex]
+            .trim()
+            .split(/\s+/)
+            .filter(Boolean);
 
-          if (!line || context.measureText(next).width <= maxWidth) {
-            line = next;
+          if (!words.length) {
+            if (lines.length && lines.length < maxLines) lines.push('');
             continue;
           }
 
-          lines.push(line);
-          line = word;
+          let line = '';
 
-          if (lines.length >= maxLines) break;
-        }
+          for (let wordIndex = 0; wordIndex < words.length; wordIndex += 1) {
+            const word = words[wordIndex];
+            const next = line ? `${line} ${word}` : word;
 
-        if (lines.length < maxLines && line) lines.push(line);
-
-        if (lines.length === maxLines && words.length) {
-          const consumed = lines.join(' ').split(/\s+/).length;
-          if (consumed < words.length) {
-            let last = lines[maxLines - 1];
-
-            while (last && context.measureText(last + '…').width > maxWidth) {
-              last = last.slice(0, -1);
+            if (!line || context.measureText(next).width <= maxWidth) {
+              line = next;
+              continue;
             }
 
-            lines[maxLines - 1] = last.replace(/[\s,.;:!?-]+$/g, '') + '…';
+            lines.push(line);
+            line = word;
+
+            if (lines.length >= maxLines) {
+              truncated = true;
+              break;
+            }
+          }
+
+          if (truncated) break;
+
+          if (line) {
+            if (lines.length < maxLines) {
+              lines.push(line);
+            } else {
+              truncated = true;
+              break;
+            }
+          }
+
+          if (
+            paragraphIndex < paragraphs.length - 1 &&
+            lines.length < maxLines
+          ) {
+            lines.push('');
           }
         }
 
+        if (truncated && lines.length) {
+          let last = lines[lines.length - 1];
+
+          while (last && context.measureText(last + '…').width > maxWidth) {
+            last = last.slice(0, -1);
+          }
+
+          lines[lines.length - 1] =
+            last.replace(/[\s,.;:!?-]+$/g, '') + '…';
+        }
+
         return lines;
+      }
+
+      function fitCanvasParagraphs(
+        context,
+        text,
+        maxWidth,
+        maxHeight,
+        family,
+        maxFontSize,
+        minFontSize,
+        weight = 500
+      ) {
+        let fontSize = maxFontSize;
+        let lines = [];
+        let lineHeight = fontSize * 1.2;
+
+        while (fontSize >= minFontSize) {
+          lineHeight = fontSize * 1.2;
+          context.font = `${weight} ${fontSize}px ${family}`;
+          lines = wrapCanvasText(context, text, maxWidth, Infinity);
+
+          if (lines.length * lineHeight <= maxHeight) {
+            return { fontSize, lineHeight, lines };
+          }
+
+          fontSize -= 0.25;
+        }
+
+        fontSize = minFontSize;
+        lineHeight = fontSize * 1.15;
+        context.font = `${weight} ${fontSize}px ${family}`;
+
+        const maxLines = Math.max(1, Math.floor(maxHeight / lineHeight));
+        lines = wrapCanvasText(context, text, maxWidth, maxLines);
+
+        return { fontSize, lineHeight, lines };
       }
 
       function rarityOf(card) {
@@ -776,22 +845,20 @@
           }
         }
 
-        // Description : le line-clamp/flex du site peut reporter une hauteur
-        // minuscule dans getBoundingClientRect(). On recalcule donc la vraie
-        // zone disponible entre le titre/prix et les stats.
+        // Description complète : on utilise tout le textContent du <p>,
+        // même si WikiMasters le line-clamp visuellement. La taille est ajustée
+        // pour remplir l'espace disponible sans perdre les paragraphes.
         const description = descriptionElement?.textContent?.trim() || '';
         const descriptionRect = relativeRect(descriptionElement, cardRect);
 
         if (description && descriptionElement) {
           const style = getComputedStyle(descriptionElement);
-          const fontSize = Math.max(
-            8,
-            Math.min(10.5, Number.parseFloat(style.fontSize) || 10)
-          );
-          const lineHeight = Math.max(
-            fontSize * 1.15,
-            Number.parseFloat(style.lineHeight) || fontSize * 1.22
-          );
+
+          const parsedFontSize = Number.parseFloat(style.fontSize);
+          const baseFontSize = Number.isFinite(parsedFontSize)
+            ? Math.max(8, Math.min(10.5, parsedFontSize))
+            : 10;
+
           const family = style.fontFamily || 'sans-serif';
 
           const titleBottom = titleRect
@@ -803,10 +870,15 @@
               ? relativeRect(averageElement, cardRect)
               : null;
 
+          const textPanel =
+            titleElement?.closest('div[class*="top-[45%]"]') ||
+            descriptionElement.parentElement;
+          const textPanelRect = relativeRect(textPanel, cardRect);
+
           const contentStart = Math.max(
-            descriptionRect?.y || 0,
             titleBottom + 5,
-            averageRect ? averageRect.y + averageRect.height + 5 : 0
+            averageRect ? averageRect.y + averageRect.height + 5 : 0,
+            textPanelRect ? textPanelRect.y + 28 : 0
           );
 
           const attackIconForLayout = card.querySelector('svg.lucide-swords');
@@ -818,47 +890,64 @@
             defenseIconForLayout?.closest('div[class*="justify-between"]');
 
           const statsRect = relativeRect(statsRow, cardRect);
-          const contentBottom = statsRect?.y || (height - 12);
+
+          const panelBottom = textPanelRect
+            ? textPanelRect.y + textPanelRect.height - 8
+            : height - 10;
+
+          const contentBottom = Math.min(
+            panelBottom,
+            statsRect?.y ? statsRect.y - 5 : panelBottom
+          );
+
           const availableHeight = Math.max(
-            lineHeight,
-            contentBottom - contentStart - 5
+            30,
+            contentBottom - contentStart
           );
 
-          const descriptionX = descriptionRect?.x || 12;
+          const descriptionX =
+            descriptionRect?.x ||
+            (textPanelRect ? textPanelRect.x + 12 : 12);
+
           const descriptionWidth = Math.max(
-            40,
-            descriptionRect?.width || (width - descriptionX - 12)
-          );
-
-          // La carte WikiMasters affiche jusqu'à 10 lignes. On garde la même
-          // limite, mais on utilise toute la hauteur réellement disponible.
-          const maxLines = Math.max(
-            1,
-            Math.min(10, Math.floor(availableHeight / lineHeight))
+            60,
+            descriptionRect?.width ||
+            (textPanelRect
+              ? textPanelRect.width - 24
+              : width - descriptionX - 12)
           );
 
           context.save();
-          context.font = `500 ${fontSize}px ${family}`;
+
+          const fitted = fitCanvasParagraphs(
+            context,
+            description,
+            descriptionWidth,
+            availableHeight,
+            family,
+            baseFontSize,
+            5.5,
+            500
+          );
+
+          context.font =
+            `500 ${fitted.fontSize}px ${family}`;
           context.fillStyle = isPremium
             ? 'rgba(255,255,255,0.88)'
             : style.color;
           context.textAlign = 'left';
           context.textBaseline = 'top';
 
-          const lines = wrapCanvasText(
-            context,
-            description,
-            descriptionWidth,
-            maxLines
-          );
+          fitted.lines.forEach((line, index) => {
+            if (!line) return;
 
-          lines.forEach((line, index) => {
             context.fillText(
               line,
               descriptionX,
-              contentStart + index * lineHeight
+              contentStart + index * fitted.lineHeight
             );
           });
+
           context.restore();
         }
 
