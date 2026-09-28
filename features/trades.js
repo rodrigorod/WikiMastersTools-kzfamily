@@ -8,7 +8,7 @@
       const activeTradeValueIds = new Set();
       let tradesRequested = false;
       function ensureTradesLoaded() {
-        if (!isFeatureEnabled('tradeValues')) return;
+        if (!isFeatureEnabled('tradeValues') && !isFeatureEnabled('tradePreviews')) return;
         if (!isTradesPage() || tradesRequested) return;
         tradesRequested = true;
         window.dispatchEvent(new CustomEvent('wm-average-load-trades'));
@@ -344,6 +344,104 @@
         );
       }
     
+
+      function parseTradeChipRarity(chip) {
+        const style = chip.getAttribute('style') || '';
+        const match = style.match(/--color-rarity-([a-z]+)\)/i);
+        return match ? match[1].toUpperCase() : '';
+      }
+
+      function tradePreviewKey(title, rarity, imageUrl) {
+        return [title, rarity, imageUrl || ''].join('|');
+      }
+
+      function createTradePreview(title, rarity, imageUrl) {
+        const preview = document.createElement('div');
+        preview.className = 'wm-trade-preview-card';
+        preview.dataset.wmTradePreview = '1';
+        preview.dataset.rarity = rarity;
+
+        const art = document.createElement('div');
+        art.className = 'wm-trade-preview-art';
+
+        if (imageUrl) {
+          const image = document.createElement('img');
+          image.className = 'wm-trade-preview-image';
+          image.alt = '';
+          image.loading = 'lazy';
+          image.decoding = 'async';
+          image.referrerPolicy = 'no-referrer';
+          image.src = imageUrl;
+          image.addEventListener('error', () => {
+            image.remove();
+            art.classList.add('is-fallback');
+          }, { once: true });
+          art.append(image);
+        } else {
+          art.classList.add('is-fallback');
+        }
+
+        const fallback = document.createElement('span');
+        fallback.className = 'wm-trade-preview-fallback';
+        fallback.textContent = title
+          .split(/\s+/)
+          .filter(Boolean)
+          .slice(0, 2)
+          .map((word) => word[0] || '')
+          .join('')
+          .toUpperCase();
+        art.append(fallback);
+
+        const rarityBadge = document.createElement('span');
+        rarityBadge.className = 'wm-trade-preview-rarity';
+        rarityBadge.textContent = rarity || '—';
+        art.append(rarityBadge);
+
+        const titleEl = document.createElement('span');
+        titleEl.className = 'wm-trade-preview-title';
+        titleEl.textContent = title;
+
+        preview.append(art, titleEl);
+        return preview;
+      }
+
+      function renderTradePreviews() {
+        if (!isTradesPage()) return;
+
+        if (!isFeatureEnabled('tradePreviews')) {
+          document.querySelectorAll('.wm-trade-preview-card').forEach((preview) => preview.remove());
+          return;
+        }
+
+        for (const chip of document.querySelectorAll('span[title][style*="--color-rarity-"]')) {
+          const title = normalizeTitle(chip.getAttribute('title'));
+          const rarity = parseTradeChipRarity(chip);
+          if (!title || !rarity) continue;
+
+          const id = idByTitle.get(title);
+          const meta = id ? cardMetaById.get(id) : null;
+          const imageUrl = meta?.imageUrl || null;
+          const key = tradePreviewKey(title, rarity, imageUrl);
+
+          const previous = chip.previousElementSibling;
+          if (
+            previous?.classList?.contains('wm-trade-preview-card') &&
+            previous.dataset.wmTradePreviewKey === key
+          ) {
+            continue;
+          }
+
+          const preview = createTradePreview(title, rarity, imageUrl);
+          preview.dataset.wmTradePreviewKey = key;
+
+          if (previous?.classList?.contains('wm-trade-preview-card')) {
+            previous.replaceWith(preview);
+          } else {
+            chip.parentElement?.insertBefore(preview, chip);
+          }
+        }
+      }
+
       function renderTradeButtons() {
         if (!isFeatureEnabled('tradeValues')) return;
         if (!isTradesPage() || !tradesById.size) return;
@@ -391,7 +489,7 @@
       }
       
       window.addEventListener('wm-average-trades', (event) => {
-          if (!isFeatureEnabled('tradeValues')) return;
+          if (!isFeatureEnabled('tradeValues') && !isFeatureEnabled('tradePreviews')) return;
           const detail = event.detail || {};
           const trades = Array.isArray(detail.trades) ? detail.trades : [];
       
@@ -404,9 +502,18 @@
           }
       
           renderTradeButtons();
+          renderTradePreviews();
           renderTradeDetailCards();
         });
-      return { ensureTradesLoaded, renderTradeDetailCard, renderTradeDetailCards, renderTradeButtons, renderTradeValuesForCard, resetTradesRequest, tradeMatchScore };
+      return {
+        ensureTradesLoaded,
+        renderTradeDetailCard,
+        renderTradeDetailCards,
+        renderTradeButtons,
+        renderTradePreviews,
+        renderTradeValuesForCard,
+        resetTradesRequest, tradeMatchScore
+      };
     }
   };
 })();
