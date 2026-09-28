@@ -8,6 +8,66 @@ function getExtensionRuntime() {
 
 if (typeof window !== 'undefined' && typeof document !== 'undefined') {
   (() => {
+    // Pont page -> contexte extension pour la copie d'image.
+    // Le rendu PNG reste produit par la page, mais l'écriture presse-papiers
+    // est effectuée ici afin de bénéficier de la permission clipboardWrite.
+    window.addEventListener('message', async (event) => {
+      if (event.source !== window) return;
+
+      const message = event.data;
+      if (
+        !message ||
+        message.source !== 'wm-average-page' ||
+        message.type !== 'copy-card-image' ||
+        typeof message.requestId !== 'string' ||
+        typeof message.dataUrl !== 'string'
+      ) {
+        return;
+      }
+
+      const reply = (ok, error = null) => {
+        window.postMessage({
+          source: 'wm-average-extension',
+          type: 'copy-card-image-result',
+          requestId: message.requestId,
+          ok,
+          error
+        }, '*');
+      };
+
+      try {
+        const response = await fetch(message.dataUrl);
+        const blob = await response.blob();
+
+        const firefoxClipboard =
+          typeof browser !== 'undefined' &&
+          browser?.clipboard?.setImageData;
+
+        if (firefoxClipboard) {
+          const buffer = await blob.arrayBuffer();
+          await browser.clipboard.setImageData(buffer, 'png');
+          reply(true);
+          return;
+        }
+
+        if (
+          typeof ClipboardItem === 'function' &&
+          typeof navigator.clipboard?.write === 'function'
+        ) {
+          await navigator.clipboard.write([
+            new ClipboardItem({ 'image/png': blob })
+          ]);
+          reply(true);
+          return;
+        }
+
+        throw new Error('API de copie d’image indisponible');
+      } catch (error) {
+        console.error('[WM Average] copie image extension impossible', error);
+        reply(false, String(error?.message || error));
+      }
+    });
+
     if (window.__wmAverageBootstrapInjected) return;
     window.__wmAverageBootstrapInjected = true;
 
