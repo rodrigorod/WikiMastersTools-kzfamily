@@ -5,7 +5,8 @@
     create(runtime) {
       const {
         PULL_RECAP_ENABLED_KEY, AUTO_OPEN_ENABLED_KEY, AUTO_OPEN_NEXT_AT_KEY,
-        AUTO_OPEN_SESSION_KEY, AUTO_OPEN_MIN_DELAY, AUTO_OPEN_MAX_DELAY,
+        AUTO_OPEN_SESSION_KEY, AUTO_OPEN_MIN_MINUTES_KEY, AUTO_OPEN_MAX_MINUTES_KEY,
+        AUTO_OPEN_DEFAULT_MIN_MINUTES, AUTO_OPEN_DEFAULT_MAX_MINUTES,
         ALL_COLLECTION_KEY, cacheMemory, isPullsPage, isLastPullCardVisible,
         normalizeTitle, readLocalValue, writeLocalValue, storageGet, storageSet,
         reportError, createSponsorNote
@@ -249,10 +250,33 @@
         return session;
       }
 
+      function getAutoOpenDelayBounds() {
+        const normalizeMinutes = (value, fallback) => {
+          const numeric = Math.round(Number(value));
+          if (!Number.isFinite(numeric)) return fallback;
+          return Math.max(1, Math.min(10080, numeric));
+        };
+
+        const first = normalizeMinutes(
+          readLocalValue(AUTO_OPEN_MIN_MINUTES_KEY),
+          AUTO_OPEN_DEFAULT_MIN_MINUTES
+        );
+        const second = normalizeMinutes(
+          readLocalValue(AUTO_OPEN_MAX_MINUTES_KEY),
+          AUTO_OPEN_DEFAULT_MAX_MINUTES
+        );
+
+        return {
+          minDelay: Math.min(first, second) * 60 * 1000,
+          maxDelay: Math.max(first, second) * 60 * 1000
+        };
+      }
+
       function randomAutoOpenDelay() {
+        const { minDelay, maxDelay } = getAutoOpenDelayBounds();
         return Math.round(
-          AUTO_OPEN_MIN_DELAY +
-          Math.random() * (AUTO_OPEN_MAX_DELAY - AUTO_OPEN_MIN_DELAY)
+          minDelay +
+          Math.random() * (maxDelay - minDelay)
         );
       }
 

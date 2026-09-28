@@ -58,7 +58,7 @@
             ['packRecap', 'Récapitulatif des prix', 'Affiche le récap des cartes et de leurs prix après un paquet.'],
             ['pullStats', 'Statistiques de tirage', 'Compte les raretés obtenues et affiche leur répartition.'],
             ['openAll', 'Bouton « Tout ouvrir »', 'Permet d’ouvrir tous les paquets disponibles sans les animations.'],
-            ['autoOpen', 'Ouverture automatique', 'Permet les cycles automatiques espacés aléatoirement de 20 à 100 minutes.']
+            ['autoOpen', 'Ouverture automatique', 'Permet les cycles automatiques avec un intervalle aléatoire personnalisable.']
           ]
         },
         {
@@ -70,7 +70,56 @@
         }
       ];
 
-      const { readLocalValue, writeLocalValue, normalizeTitle } = core;
+      const {
+        readLocalValue,
+        writeLocalValue,
+        normalizeTitle,
+        AUTO_OPEN_NEXT_AT_KEY,
+        AUTO_OPEN_MIN_MINUTES_KEY,
+        AUTO_OPEN_MAX_MINUTES_KEY,
+        AUTO_OPEN_DEFAULT_MIN_MINUTES,
+        AUTO_OPEN_DEFAULT_MAX_MINUTES
+      } = core;
+
+      function normalizeAutoOpenInterval(minValue, maxValue) {
+        const clampMinutes = (value, fallback) => {
+          const numeric = Math.round(Number(value));
+          if (!Number.isFinite(numeric)) return fallback;
+          return Math.max(1, Math.min(10080, numeric));
+        };
+
+        const first = clampMinutes(minValue, AUTO_OPEN_DEFAULT_MIN_MINUTES);
+        const second = clampMinutes(maxValue, AUTO_OPEN_DEFAULT_MAX_MINUTES);
+
+        return {
+          minMinutes: Math.min(first, second),
+          maxMinutes: Math.max(first, second)
+        };
+      }
+
+      function getAutoOpenInterval() {
+        return normalizeAutoOpenInterval(
+          readLocalValue(AUTO_OPEN_MIN_MINUTES_KEY),
+          readLocalValue(AUTO_OPEN_MAX_MINUTES_KEY)
+        );
+      }
+
+      function saveAutoOpenInterval(minValue, maxValue) {
+        const interval = normalizeAutoOpenInterval(minValue, maxValue);
+        const previous = getAutoOpenInterval();
+
+        writeLocalValue(AUTO_OPEN_MIN_MINUTES_KEY, interval.minMinutes);
+        writeLocalValue(AUTO_OPEN_MAX_MINUTES_KEY, interval.maxMinutes);
+
+        if (
+          interval.minMinutes !== previous.minMinutes ||
+          interval.maxMinutes !== previous.maxMinutes
+        ) {
+          localStorage.removeItem(AUTO_OPEN_NEXT_AT_KEY);
+        }
+
+        return interval;
+      }
 
       function getSettings() {
         const saved = readLocalValue(SETTINGS_KEY);
@@ -97,6 +146,7 @@
         document.getElementById('wm-settings-overlay')?.remove();
 
         let draft = getSettings();
+        let draftAutoOpenInterval = getAutoOpenInterval();
         const overlay = document.createElement('div');
         overlay.id = 'wm-settings-overlay';
         overlay.className = 'wm-modal-overlay wm-settings-overlay';
@@ -183,6 +233,79 @@
             list.append(row);
           }
 
+          if (category.title === 'Paquets') {
+            const intervalRow = document.createElement('div');
+            intervalRow.className = 'wm-settings-row wm-settings-interval-row';
+
+            const intervalCopy = document.createElement('span');
+            intervalCopy.className = 'wm-settings-copy';
+
+            const intervalLabel = document.createElement('strong');
+            intervalLabel.textContent = 'Intervalle d’ouverture automatique';
+
+            const intervalDescription = document.createElement('span');
+            intervalDescription.textContent = 'Un délai aléatoire est choisi entre ces deux valeurs.';
+            intervalCopy.append(intervalLabel, intervalDescription);
+
+            const intervalFields = document.createElement('div');
+            intervalFields.className = 'wm-settings-interval-fields';
+
+            const createMinuteField = (labelText, value, onChange) => {
+              const field = document.createElement('label');
+              field.className = 'wm-settings-minute-field';
+
+              const fieldLabel = document.createElement('span');
+              fieldLabel.textContent = labelText;
+
+              const input = document.createElement('input');
+              input.type = 'number';
+              input.min = '1';
+              input.max = '10080';
+              input.step = '1';
+              input.inputMode = 'numeric';
+              input.value = String(value);
+              input.addEventListener('input', () => onChange(input.value));
+
+              field.append(fieldLabel, input);
+              return { field, input };
+            };
+
+            const minField = createMinuteField(
+              'Min',
+              draftAutoOpenInterval.minMinutes,
+              (value) => {
+                draftAutoOpenInterval = {
+                  ...draftAutoOpenInterval,
+                  minMinutes: value
+                };
+              }
+            );
+
+            const maxField = createMinuteField(
+              'Max',
+              draftAutoOpenInterval.maxMinutes,
+              (value) => {
+                draftAutoOpenInterval = {
+                  ...draftAutoOpenInterval,
+                  maxMinutes: value
+                };
+              }
+            );
+
+            intervalFields.append(minField.field, maxField.field);
+
+            const unit = document.createElement('span');
+            unit.className = 'wm-settings-interval-unit';
+            unit.textContent = 'min';
+            intervalFields.append(unit);
+
+            intervalRow.append(intervalCopy, intervalFields);
+            list.append(intervalRow);
+
+            inputs.set('__autoOpenMin', minField.input);
+            inputs.set('__autoOpenMax', maxField.input);
+          }
+
           section.append(sectionHead, list);
           body.append(section);
         }
@@ -203,7 +326,22 @@
         resetButton.textContent = 'Tout réactiver';
         resetButton.addEventListener('click', () => {
           draft = { ...DEFAULTS };
+          draftAutoOpenInterval = {
+            minMinutes: AUTO_OPEN_DEFAULT_MIN_MINUTES,
+            maxMinutes: AUTO_OPEN_DEFAULT_MAX_MINUTES
+          };
+
           for (const [key, input] of inputs) {
+            if (key === '__autoOpenMin') {
+              input.value = String(AUTO_OPEN_DEFAULT_MIN_MINUTES);
+              continue;
+            }
+
+            if (key === '__autoOpenMax') {
+              input.value = String(AUTO_OPEN_DEFAULT_MAX_MINUTES);
+              continue;
+            }
+
             input.checked = true;
             input.closest('.wm-settings-row')?.classList.add('is-enabled');
           }
@@ -220,6 +358,17 @@
         applyButton.textContent = 'Appliquer';
         applyButton.addEventListener('click', () => {
           saveSettings(draft);
+
+          const normalizedInterval = saveAutoOpenInterval(
+            inputs.get('__autoOpenMin')?.value ?? draftAutoOpenInterval.minMinutes,
+            inputs.get('__autoOpenMax')?.value ?? draftAutoOpenInterval.maxMinutes
+          );
+
+          const minInput = inputs.get('__autoOpenMin');
+          const maxInput = inputs.get('__autoOpenMax');
+          if (minInput) minInput.value = String(normalizedInterval.minMinutes);
+          if (maxInput) maxInput.value = String(normalizedInterval.maxMinutes);
+
           location.reload();
         });
 
@@ -323,6 +472,8 @@
         getSettings,
         isEnabled,
         saveSettings,
+        getAutoOpenInterval,
+        saveAutoOpenInterval,
         ensureButton,
         openSettings
       };

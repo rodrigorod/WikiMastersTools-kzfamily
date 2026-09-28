@@ -2563,6 +2563,53 @@ div[class*="glow-"]:has(> div[class*="top-0"][class*="h-[45%]"] img):has(h3):not
   background: #fff;
 }
 
+.wm-settings-interval-row {
+  cursor: default;
+}
+
+.wm-settings-interval-fields {
+  display: flex;
+  align-items: flex-end;
+  gap: 7px;
+  flex: 0 0 auto;
+}
+
+.wm-settings-minute-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  color: #7f8a9b;
+  font-size: 8px;
+  font-weight: 700;
+}
+
+.wm-settings-minute-field input {
+  width: 64px;
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 7px;
+  outline: none;
+  background: rgba(8, 10, 14, 0.72);
+  color: #f8fafc;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.wm-settings-minute-field input:focus {
+  border-color: rgba(191, 148, 255, 0.78);
+  box-shadow: 0 0 0 2px rgba(191, 148, 255, 0.10);
+}
+
+.wm-settings-interval-unit {
+  padding-bottom: 7px;
+  color: #64748b;
+  font-size: 8.5px;
+  font-weight: 700;
+}
+
 .wm-settings-footer {
   display: flex;
   align-items: center;
@@ -2613,6 +2660,15 @@ div[class*="glow-"]:has(> div[class*="top-0"][class*="h-[45%]"] img):has(h3):not
 
   .wm-settings-launch {
     width: max-content;
+  }
+
+  .wm-settings-interval-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .wm-settings-interval-fields {
+    justify-content: flex-start;
   }
 
   .wm-settings-footer {
