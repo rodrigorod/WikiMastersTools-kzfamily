@@ -532,6 +532,29 @@
           ? card.querySelector(':scope > img')
           : null;
 
+        // En mode natif, aligne la photo sur les vrais gutters du panneau texte
+        // plutôt que sur toute la largeur de la zone 45 %.
+        const nativeTextPanel =
+          titleElement?.closest('div[class*="top-[45%]"]') ||
+          descriptionElement?.parentElement ||
+          null;
+        const nativeTextPanelRect = relativeRect(nativeTextPanel, cardRect);
+        const nativeTextPanelStyle = nativeTextPanel
+          ? getComputedStyle(nativeTextPanel)
+          : null;
+        const nativePaddingLeft =
+          Number.parseFloat(nativeTextPanelStyle?.paddingLeft) || 0;
+        const nativePaddingRight =
+          Number.parseFloat(nativeTextPanelStyle?.paddingRight) || 0;
+        const nativeContentLeft = nativeTextPanelRect
+          ? nativeTextPanelRect.x + nativePaddingLeft
+          : 12;
+        const nativeContentRight = nativeTextPanelRect
+          ? nativeTextPanelRect.x +
+            nativeTextPanelRect.width -
+            nativePaddingRight
+          : width - 12;
+
         const artUrl =
           artImage?.currentSrc ||
           artImage?.src ||
@@ -707,21 +730,40 @@
           context.fillStyle = topShade;
           context.fillRect(0, 0, width, height * 0.42);
 
-          // Photo strictement dans la zone 45 % du design original.
+          // Photo dans la zone 45 %, avec les mêmes gutters horizontaux
+          // que le panneau titre/description calculés depuis le DOM réel.
           if (image && artLayer) {
             const artRect = relativeRect(artLayer, cardRect);
 
             if (artRect) {
+              const nativeArtX = Math.max(
+                artRect.x,
+                Math.min(artRect.x + artRect.width, nativeContentLeft)
+              );
+              const nativeArtRight = Math.min(
+                artRect.x + artRect.width,
+                Math.max(artRect.x, nativeContentRight)
+              );
+              const nativeArtWidth = Math.max(
+                1,
+                nativeArtRight - nativeArtX
+              );
+
               context.save();
-              context.rect(artRect.x, artRect.y, artRect.width, artRect.height);
+              context.rect(
+                nativeArtX,
+                artRect.y,
+                nativeArtWidth,
+                artRect.height
+              );
               context.clip();
 
               drawImageCover(
                 context,
                 image,
-                artRect.x,
+                nativeArtX,
                 artRect.y,
-                artRect.width,
+                nativeArtWidth,
                 artRect.height,
                 parseObjectPositionY(artImage)
               );
@@ -737,9 +779,9 @@
               nativeFade.addColorStop(1, 'rgba(0,0,0,0.50)');
               context.fillStyle = nativeFade;
               context.fillRect(
-                artRect.x,
+                nativeArtX,
                 artRect.y + artRect.height - nativeFadeHeight,
-                artRect.width,
+                nativeArtWidth,
                 nativeFadeHeight
               );
               context.restore();
@@ -1002,18 +1044,23 @@
 
         context.restore();
 
-        // Le full-art possède sa bordure métallique propre. En natif, le
-        // fond rarity asset est conservé tel quel, donc on n'ajoute rien.
+        // Bordure finale commune : elle reste métallique/glow en full-art
+        // et devient nette mais discrète en natif.
+        context.save();
+        roundedRectPath(context, 1, 1, width - 2, height - 2, radius - 1);
+        context.strokeStyle = accent;
+        context.lineWidth = 2;
+
         if (isPremium) {
-          context.save();
-          roundedRectPath(context, 1, 1, width - 2, height - 2, radius - 1);
-          context.strokeStyle = accent;
-          context.lineWidth = 2;
           context.shadowColor = accent + '66';
           context.shadowBlur = 8;
-          context.stroke();
-          context.restore();
+        } else {
+          context.shadowColor = 'rgba(0,0,0,0.20)';
+          context.shadowBlur = 2;
         }
+
+        context.stroke();
+        context.restore();
 
         return await canvasBlob(canvas);
       }
