@@ -1044,24 +1044,6 @@
 
         context.restore();
 
-        // Bordure finale commune : elle reste métallique/glow en full-art
-        // et devient nette mais discrète en natif.
-        context.save();
-        roundedRectPath(context, 1, 1, width - 2, height - 2, radius - 1);
-        context.strokeStyle = accent;
-        context.lineWidth = 2;
-
-        if (isPremium) {
-          context.shadowColor = accent + '66';
-          context.shadowBlur = 8;
-        } else {
-          context.shadowColor = 'rgba(0,0,0,0.20)';
-          context.shadowBlur = 2;
-        }
-
-        context.stroke();
-        context.restore();
-
         return await canvasBlob(canvas);
       }
 
