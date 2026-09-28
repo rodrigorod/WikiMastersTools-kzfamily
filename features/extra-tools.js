@@ -333,19 +333,98 @@
 
       function setCopyState(button, state) {
         button.dataset.wmCopyState = state;
-        button.textContent =
-          state === 'done' ? '✓' :
-          state === 'failed' ? '×' :
-          state === 'busy' ? '…' : '⧉';
 
-        const label =
+        const text =
+          state === 'done' ? 'Copiée' :
+          state === 'failed' ? 'Échec' :
+          state === 'busy' ? 'Partage…' :
+          'Partager';
+
+        const iconPath =
+          state === 'done'
+            ? 'M5 12l4 4L19 7'
+            : state === 'failed'
+              ? 'M6 6l12 12M18 6L6 18'
+              : 'M9 8h10v12H9zM5 16H4V4h11v1';
+
+        button.replaceChildren();
+
+        const label = document.createElement('span');
+        label.className = 'wm-copy-card-label';
+        label.textContent = text;
+
+        const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        icon.setAttribute('viewBox', '0 0 24 24');
+        icon.setAttribute('aria-hidden', 'true');
+
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', iconPath);
+        icon.append(path);
+
+        button.append(label, icon);
+
+        const aria =
           state === 'done' ? 'Carte copiée' :
           state === 'failed' ? 'Échec de la copie' :
           state === 'busy' ? 'Copie en cours' :
-          'Copier la carte comme image';
+          'Partager la carte comme image';
 
-        button.title = label;
-        button.setAttribute('aria-label', label);
+        button.title = aria;
+        button.setAttribute('aria-label', aria);
+      }
+
+      function requestCardCapture(card) {
+        const rect = card.getBoundingClientRect();
+        const requestId =
+          'wm-copy-' +
+          Date.now().toString(36) +
+          '-' +
+          Math.random().toString(36).slice(2, 9);
+
+        return new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            window.removeEventListener('message', onMessage);
+            reject(new Error('La copie a expiré'));
+          }, 8000);
+
+          function onMessage(messageEvent) {
+            if (messageEvent.source !== window) return;
+
+            const message = messageEvent.data;
+            if (
+              !message ||
+              message.source !== 'wm-average-extension' ||
+              message.type !== 'copy-card-image-result' ||
+              message.requestId !== requestId
+            ) {
+              return;
+            }
+
+            clearTimeout(timeout);
+            window.removeEventListener('message', onMessage);
+
+            if (message.ok) {
+              resolve(true);
+            } else {
+              reject(new Error(message.error || 'Copie refusée'));
+            }
+          }
+
+          window.addEventListener('message', onMessage);
+          window.postMessage({
+            source: 'wm-average-page',
+            type: 'capture-card-image',
+            requestId,
+            rect: {
+              left: rect.left,
+              top: rect.top,
+              right: rect.right,
+              bottom: rect.bottom,
+              width: rect.width,
+              height: rect.height
+            }
+          }, '*');
+        });
       }
 
       function installCopyButton(card) {
@@ -364,61 +443,23 @@
           if (!event.isTrusted || button.dataset.wmCopyState === 'busy') return;
 
           setCopyState(button, 'busy');
+          card.classList.add('wm-copy-capturing');
 
           try {
-            const blob = await snapshotCard(card);
-            const dataUrl = await blobToDataUrl(blob);
-            const requestId =
-              'wm-copy-' +
-              Date.now().toString(36) +
-              '-' +
-              Math.random().toString(36).slice(2, 9);
+            // Deux frames laissent le temps au navigateur de masquer les contrôles
+            // avant la capture réelle de l'onglet.
+            await new Promise((resolve) => requestAnimationFrame(() => {
+              requestAnimationFrame(resolve);
+            }));
 
-            const result = await new Promise((resolve, reject) => {
-              const timeout = setTimeout(() => {
-                window.removeEventListener('message', onMessage);
-                reject(new Error('La copie a expiré'));
-              }, 8000);
-
-              function onMessage(messageEvent) {
-                if (messageEvent.source !== window) return;
-
-                const message = messageEvent.data;
-                if (
-                  !message ||
-                  message.source !== 'wm-average-extension' ||
-                  message.type !== 'copy-card-image-result' ||
-                  message.requestId !== requestId
-                ) {
-                  return;
-                }
-
-                clearTimeout(timeout);
-                window.removeEventListener('message', onMessage);
-
-                if (message.ok) {
-                  resolve(true);
-                } else {
-                  reject(new Error(message.error || 'Copie refusée'));
-                }
-              }
-
-              window.addEventListener('message', onMessage);
-              window.postMessage({
-                source: 'wm-average-page',
-                type: 'copy-card-image',
-                requestId,
-                dataUrl
-              }, '*');
-            });
-
-            if (result) {
-              setCopyState(button, 'done');
-            }
+            await requestCardCapture(card);
+            setCopyState(button, 'done');
           } catch (error) {
             console.error('[WM Average] copie image impossible', error);
             setCopyState(button, 'failed');
             button.title = 'Échec : ' + String(error?.message || error);
+          } finally {
+            card.classList.remove('wm-copy-capturing');
           }
 
           setTimeout(() => setCopyState(button, 'idle'), 1800);
