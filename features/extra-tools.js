@@ -509,9 +509,13 @@
         const scale = 2;
         const isPremium = card.classList.contains('wm-premium-card');
 
+        const outerPad = 18;
+        const canvasWidth = width + outerPad * 2;
+        const canvasHeight = height + outerPad * 2;
+
         const canvas = document.createElement('canvas');
-        canvas.width = width * scale;
-        canvas.height = height * scale;
+        canvas.width = canvasWidth * scale;
+        canvas.height = canvasHeight * scale;
 
         const context = canvas.getContext('2d');
         if (!context) throw new Error('Canvas indisponible');
@@ -522,6 +526,24 @@
         const accent = rarityAccent(rarity);
         const radius = 16;
 
+        // Fond extérieur du PNG : permet de voir les coins arrondis et le glow.
+        context.fillStyle = '#050505';
+        context.fillRect(0, 0, canvasWidth, canvasHeight);
+
+        context.save();
+        context.translate(outerPad, outerPad);
+
+        // Ombre/glow de rareté derrière la carte, sans ajouter de bordure.
+        context.save();
+        roundedRectPath(context, 0, 0, width, height, radius);
+        context.fillStyle = '#0b0b0b';
+        context.shadowColor = accent + '99';
+        context.shadowBlur = 18;
+        context.shadowOffsetX = 0;
+        context.shadowOffsetY = 0;
+        context.fill();
+        context.restore();
+
         const titleElement = card.querySelector('h3');
         const descriptionElement = card.querySelector('p');
         const averageElement = card.querySelector('.wm-average-badge');
@@ -531,29 +553,6 @@
         const nativeBackgroundImage = !isPremium
           ? card.querySelector(':scope > img')
           : null;
-
-        // En mode natif, aligne la photo sur les vrais gutters du panneau texte
-        // plutôt que sur toute la largeur de la zone 45 %.
-        const nativeTextPanel =
-          titleElement?.closest('div[class*="top-[45%]"]') ||
-          descriptionElement?.parentElement ||
-          null;
-        const nativeTextPanelRect = relativeRect(nativeTextPanel, cardRect);
-        const nativeTextPanelStyle = nativeTextPanel
-          ? getComputedStyle(nativeTextPanel)
-          : null;
-        const nativePaddingLeft =
-          Number.parseFloat(nativeTextPanelStyle?.paddingLeft) || 0;
-        const nativePaddingRight =
-          Number.parseFloat(nativeTextPanelStyle?.paddingRight) || 0;
-        const nativeContentLeft = nativeTextPanelRect
-          ? nativeTextPanelRect.x + nativePaddingLeft
-          : 12;
-        const nativeContentRight = nativeTextPanelRect
-          ? nativeTextPanelRect.x +
-            nativeTextPanelRect.width -
-            nativePaddingRight
-          : width - 12;
 
         const artUrl =
           artImage?.currentSrc ||
@@ -730,40 +729,21 @@
           context.fillStyle = topShade;
           context.fillRect(0, 0, width, height * 0.42);
 
-          // Photo dans la zone 45 %, avec les mêmes gutters horizontaux
-          // que le panneau titre/description calculés depuis le DOM réel.
+          // Photo native pleine largeur, comme sur la vraie carte WikiMasters.
           if (image && artLayer) {
             const artRect = relativeRect(artLayer, cardRect);
 
             if (artRect) {
-              const nativeArtX = Math.max(
-                artRect.x,
-                Math.min(artRect.x + artRect.width, nativeContentLeft)
-              );
-              const nativeArtRight = Math.min(
-                artRect.x + artRect.width,
-                Math.max(artRect.x, nativeContentRight)
-              );
-              const nativeArtWidth = Math.max(
-                1,
-                nativeArtRight - nativeArtX
-              );
-
               context.save();
-              context.rect(
-                nativeArtX,
-                artRect.y,
-                nativeArtWidth,
-                artRect.height
-              );
+              context.rect(artRect.x, artRect.y, artRect.width, artRect.height);
               context.clip();
 
               drawImageCover(
                 context,
                 image,
-                nativeArtX,
+                artRect.x,
                 artRect.y,
-                nativeArtWidth,
+                artRect.width,
                 artRect.height,
                 parseObjectPositionY(artImage)
               );
@@ -779,9 +759,9 @@
               nativeFade.addColorStop(1, 'rgba(0,0,0,0.50)');
               context.fillStyle = nativeFade;
               context.fillRect(
-                nativeArtX,
+                artRect.x,
                 artRect.y + artRect.height - nativeFadeHeight,
-                nativeArtWidth,
+                artRect.width,
                 nativeFadeHeight
               );
               context.restore();
@@ -1042,6 +1022,7 @@
           }
         }
 
+        context.restore();
         context.restore();
 
         return await canvasBlob(canvas);
