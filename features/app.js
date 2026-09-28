@@ -36,6 +36,7 @@
         if (isTradesPage()) {
           runtime.trades.ensureTradesLoaded();
           runtime.trades.renderTradeButtons();
+          runtime.trades.renderTradePreviews();
           runtime.trades.renderTradeDetailCards();
         }
 
@@ -46,6 +47,7 @@
 
         runtime.compactMode.ensureCompactControl();
         runtime.cardExtras.renderCardExtras();
+        runtime.extraTools.render();
       }
 
 
@@ -62,6 +64,7 @@
           isGlobalCollectionPage() ||
           isGuildPage() ||
           Boolean(document.querySelector('button[aria-label="Ouvrir la boutique WikiBidous"]')) ||
+          Boolean(document.querySelector('button[aria-label="Notifications"]')) ||
           Boolean(document.querySelector('div[class*="glow-"] h3'))
         );
       }
@@ -105,6 +108,7 @@
             '.wm-trade-values-controls, #wm-open-all-overlay, .wm-pull-stats, ' +
             '.wm-wikipedia-card-button, .wm-missing-image-credit, .wm-missing-title-art, .wm-compact-tools, .wm-price-legend, ' +
             '.wm-auto-open-control, .wm-auto-open-help, .wm-settings-launch, .wm-settings-modal, ' +
+            '.wm-copy-card-button, .wm-trade-preview-card, ' +
             '.wm-gif-button, .wm-gif-badge, .wm-gif-modal, .wm-gif-overlay, .wm-gif-filter-banner, ' +
             '.wm-discard-button, .wm-discard-modal, .wm-discard-overlay, .wm-discard-toast'
           )
