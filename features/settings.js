@@ -11,6 +11,7 @@
         wikipediaButtons: true,
         missingImages: true,
         copyCardImage: true,
+        pullShareButton: true,
         hideCardStats: true,
         collectionPrices: true,
         marketplacePrice: true,
@@ -62,6 +63,7 @@
           description: 'Outils disponibles sur la page /pulls.',
           items: [
             ['packRecap', 'Récapitulatif des prix', 'Affiche le récap des cartes et de leurs prix après un paquet.'],
+            ['pullShareButton', 'Bouton « Partager » pendant l’ouverture', 'Affiche le bouton Partager sur /pull pour copier l’écran de la carte en cours d’ouverture.'],
             ['pullStats', 'Statistiques de tirage', 'Compte les raretés obtenues et affiche leur répartition.'],
             ['openAll', 'Bouton « Tout ouvrir »', 'Permet d’ouvrir tous les paquets disponibles sans les animations.'],
             ['autoOpen', 'Ouverture automatique', 'Permet les cycles automatiques avec un intervalle aléatoire personnalisable.']

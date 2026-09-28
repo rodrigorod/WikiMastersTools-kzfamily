@@ -1372,7 +1372,7 @@
       }
 
       function syncPullShareButton() {
-        if (!isEnabled('copyCardImage')) {
+        if (!isEnabled('pullShareButton')) {
           document.querySelector('.wm-pull-share-button')?.remove();
           return;
         }
