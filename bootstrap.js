@@ -8,9 +8,8 @@ function getExtensionRuntime() {
 
 if (typeof window !== 'undefined' && typeof document !== 'undefined') {
   (() => {
-    // Pont page -> extension : capture l'onglet réel puis recadre la carte.
-    // Aucun SVG/foreignObject n'est utilisé, donc le rendu copié est exactement
-    // celui que le navigateur affiche et ne peut pas être bloqué par un canvas tainté.
+    // Pont page -> contexte extension : le PNG est déjà généré depuis les
+    // données de la carte. Ici on fait uniquement l'écriture presse-papiers.
     window.addEventListener('message', async (event) => {
       if (event.source !== window) return;
 
@@ -18,9 +17,9 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
       if (
         !message ||
         message.source !== 'wm-average-page' ||
-        message.type !== 'capture-card-image' ||
+        message.type !== 'copy-card-image' ||
         typeof message.requestId !== 'string' ||
-        !message.rect
+        typeof message.dataUrl !== 'string'
       ) {
         return;
       }
@@ -35,99 +34,14 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
         }, '*');
       };
 
-      const sendRuntimeMessage = (payload) => new Promise((resolve, reject) => {
-        const runtime =
-          typeof browser !== 'undefined' && browser?.runtime
-            ? browser.runtime
-            : typeof chrome !== 'undefined' && chrome?.runtime
-              ? chrome.runtime
-              : null;
-
-        if (!runtime?.sendMessage) {
-          reject(new Error('Messagerie extension indisponible'));
-          return;
-        }
-
-        if (typeof browser !== 'undefined' && browser?.runtime?.sendMessage) {
-          browser.runtime.sendMessage(payload).then(resolve, reject);
-          return;
-        }
-
-        runtime.sendMessage(payload, (response) => {
-          const lastError =
-            typeof chrome !== 'undefined' && chrome?.runtime?.lastError
-              ? chrome.runtime.lastError
-              : null;
-
-          if (lastError) {
-            reject(new Error(lastError.message));
-          } else {
-            resolve(response);
-          }
-        });
-      });
-
-      const imageFromUrl = (url) => new Promise((resolve, reject) => {
-        const image = new Image();
-        image.addEventListener('load', () => resolve(image), { once: true });
-        image.addEventListener('error', () => reject(new Error('Capture illisible')), { once: true });
-        image.src = url;
-      });
-
-      const canvasBlob = (canvas) => new Promise((resolve, reject) => {
-        canvas.toBlob(
-          (blob) => blob ? resolve(blob) : reject(new Error('PNG impossible')),
-          'image/png'
-        );
-      });
-
       try {
-        const captured = await sendRuntimeMessage({ type: 'wm-capture-visible-tab' });
-        if (!captured?.ok || typeof captured.dataUrl !== 'string') {
-          throw new Error(captured?.error || 'Capture de l’onglet impossible');
-        }
+        const response = await fetch(message.dataUrl);
+        const blob = await response.blob();
 
-        const screenshot = await imageFromUrl(captured.dataUrl);
-        const viewportWidth = Math.max(1, window.innerWidth);
-        const viewportHeight = Math.max(1, window.innerHeight);
-        const scaleX = screenshot.naturalWidth / viewportWidth;
-        const scaleY = screenshot.naturalHeight / viewportHeight;
-
-        const rect = message.rect;
-        const left = Math.max(0, Number(rect.left) || 0);
-        const top = Math.max(0, Number(rect.top) || 0);
-        const right = Math.min(viewportWidth, Number(rect.right) || 0);
-        const bottom = Math.min(viewportHeight, Number(rect.bottom) || 0);
-
-        if (right <= left || bottom <= top) {
-          throw new Error('La carte n’est pas visible à l’écran');
-        }
-
-        const sx = Math.round(left * scaleX);
-        const sy = Math.round(top * scaleY);
-        const sw = Math.max(1, Math.round((right - left) * scaleX));
-        const sh = Math.max(1, Math.round((bottom - top) * scaleY));
-
-        const canvas = document.createElement('canvas');
-        canvas.width = sw;
-        canvas.height = sh;
-
-        const context = canvas.getContext('2d');
-        if (!context) throw new Error('Canvas indisponible');
-
-        context.drawImage(
-          screenshot,
-          sx, sy, sw, sh,
-          0, 0, sw, sh
-        );
-
-        const blob = await canvasBlob(canvas);
-
-        const firefoxClipboard =
+        if (
           typeof browser !== 'undefined' &&
-          browser?.clipboard?.setImageData;
-
-        if (firefoxClipboard) {
+          browser?.clipboard?.setImageData
+        ) {
           await browser.clipboard.setImageData(await blob.arrayBuffer(), 'png');
           reply(true);
           return;
@@ -146,7 +60,7 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
 
         throw new Error('API de copie d’image indisponible');
       } catch (error) {
-        console.error('[WM Average] capture/copie image impossible', error);
+        console.error('[WM Average] copie image extension impossible', error);
         reply(false, String(error?.message || error));
       }
     });
