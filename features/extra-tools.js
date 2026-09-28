@@ -729,6 +729,44 @@
           context.fillStyle = topShade;
           context.fillRect(0, 0, width, height * 0.42);
 
+          // Le fichier de rareté natif contient parfois des bandes sombres
+          // latérales. Pour le PNG partagé, on redessine la zone basse en
+          // pleine largeur afin que le panneau titre/description colle bien
+          // aux bords internes de la carte, comme sur l'UI réelle.
+          const nativeTextPanel =
+            titleElement?.closest('div[class*="top-[45%]"]') ||
+            descriptionElement?.parentElement ||
+            null;
+          const nativeTextPanelRect = relativeRect(nativeTextPanel, cardRect);
+          const nativePanelTop = nativeTextPanelRect?.y ?? Math.round(height * 0.45);
+
+          if (nativeBackground && nativePanelTop < height) {
+            context.save();
+            context.beginPath();
+            context.rect(0, nativePanelTop, width, height - nativePanelTop);
+            context.clip();
+
+            // Recadre légèrement les côtés du fond de rareté pour supprimer
+            // ses marges sombres tout en conservant sa texture/couleur.
+            const panelCropX = nativeBackground.naturalWidth * 0.10;
+            const panelCropWidth = nativeBackground.naturalWidth * 0.80;
+            const panelCropY = nativeBackground.naturalHeight * 0.40;
+            const panelCropHeight = nativeBackground.naturalHeight * 0.60;
+
+            context.drawImage(
+              nativeBackground,
+              panelCropX,
+              panelCropY,
+              panelCropWidth,
+              panelCropHeight,
+              0,
+              nativePanelTop,
+              width,
+              height - nativePanelTop
+            );
+            context.restore();
+          }
+
           // Photo native pleine largeur, comme sur la vraie carte WikiMasters.
           if (image && artLayer) {
             const artRect = relativeRect(artLayer, cardRect);
