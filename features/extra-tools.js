@@ -690,29 +690,25 @@
             context.restore();
           }
         } else {
-          // Design WikiMasters natif : on réutilise son vrai fond de rareté.
+          // Design WikiMasters natif : on reproduit le vrai rendu CSS
+          // object-cover + scale-[1.8] du fond de rareté.
           if (nativeBackground) {
             context.save();
 
-            // Le fond natif possède scale-[1.8]. On reproduit ce zoom en
-            // recadrant davantage l'image source autour de son centre.
             const zoom = 1.8;
-            const sourceWidth = nativeBackground.naturalWidth / zoom;
-            const sourceHeight = nativeBackground.naturalHeight / zoom;
-            const sx = (nativeBackground.naturalWidth - sourceWidth) / 2;
-            const sy = (nativeBackground.naturalHeight - sourceHeight) / 2;
+            const backgroundWidth = width * zoom;
+            const backgroundHeight = height * zoom;
 
-            context.drawImage(
+            drawImageCover(
+              context,
               nativeBackground,
-              sx,
-              sy,
-              sourceWidth,
-              sourceHeight,
-              0,
-              0,
-              width,
-              height
+              (width - backgroundWidth) / 2,
+              (height - backgroundHeight) / 2,
+              backgroundWidth,
+              backgroundHeight,
+              0.5
             );
+
             context.restore();
           } else {
             const fallback = context.createLinearGradient(0, 0, 0, height);
@@ -728,44 +724,6 @@
           topShade.addColorStop(1, 'rgba(0,0,0,0)');
           context.fillStyle = topShade;
           context.fillRect(0, 0, width, height * 0.42);
-
-          // Le fichier de rareté natif contient parfois des bandes sombres
-          // latérales. Pour le PNG partagé, on redessine la zone basse en
-          // pleine largeur afin que le panneau titre/description colle bien
-          // aux bords internes de la carte, comme sur l'UI réelle.
-          const nativeTextPanel =
-            titleElement?.closest('div[class*="top-[45%]"]') ||
-            descriptionElement?.parentElement ||
-            null;
-          const nativeTextPanelRect = relativeRect(nativeTextPanel, cardRect);
-          const nativePanelTop = nativeTextPanelRect?.y ?? Math.round(height * 0.45);
-
-          if (nativeBackground && nativePanelTop < height) {
-            context.save();
-            context.beginPath();
-            context.rect(0, nativePanelTop, width, height - nativePanelTop);
-            context.clip();
-
-            // Recadre légèrement les côtés du fond de rareté pour supprimer
-            // ses marges sombres tout en conservant sa texture/couleur.
-            const panelCropX = nativeBackground.naturalWidth * 0.10;
-            const panelCropWidth = nativeBackground.naturalWidth * 0.80;
-            const panelCropY = nativeBackground.naturalHeight * 0.40;
-            const panelCropHeight = nativeBackground.naturalHeight * 0.60;
-
-            context.drawImage(
-              nativeBackground,
-              panelCropX,
-              panelCropY,
-              panelCropWidth,
-              panelCropHeight,
-              0,
-              nativePanelTop,
-              width,
-              height - nativePanelTop
-            );
-            context.restore();
-          }
 
           // Photo native pleine largeur, comme sur la vraie carte WikiMasters.
           if (image && artLayer) {
