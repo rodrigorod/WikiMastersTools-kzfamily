@@ -268,67 +268,446 @@
         return clone;
       }
 
+      function roundedRectPath(context, x, y, width, height, radius) {
+        const r = Math.max(0, Math.min(radius, width / 2, height / 2));
+        context.beginPath();
+        context.moveTo(x + r, y);
+        context.arcTo(x + width, y, x + width, y + height, r);
+        context.arcTo(x + width, y + height, x, y + height, r);
+        context.arcTo(x, y + height, x, y, r);
+        context.arcTo(x, y, x + width, y, r);
+        context.closePath();
+      }
+
+      function relativeRect(element, cardRect) {
+        if (!element) return null;
+        const rect = element.getBoundingClientRect();
+        return {
+          x: rect.left - cardRect.left,
+          y: rect.top - cardRect.top,
+          width: rect.width,
+          height: rect.height
+        };
+      }
+
+      function parseObjectPositionY(image) {
+        const raw = getComputedStyle(image).objectPosition || '50% 50%';
+        const parts = raw.trim().split(/\s+/);
+        const value = parts[1] || parts[0] || '50%';
+
+        if (value.endsWith('%')) {
+          const percent = Number.parseFloat(value);
+          if (Number.isFinite(percent)) return Math.max(0, Math.min(1, percent / 100));
+        }
+
+        if (value === 'top') return 0;
+        if (value === 'bottom') return 1;
+        return 0.5;
+      }
+
+      function drawImageCover(context, image, x, y, width, height, focusY = 0.5) {
+        if (!image?.naturalWidth || !image?.naturalHeight || width <= 0 || height <= 0) return;
+
+        const sourceRatio = image.naturalWidth / image.naturalHeight;
+        const targetRatio = width / height;
+
+        let sx = 0;
+        let sy = 0;
+        let sw = image.naturalWidth;
+        let sh = image.naturalHeight;
+
+        if (sourceRatio > targetRatio) {
+          sw = image.naturalHeight * targetRatio;
+          sx = (image.naturalWidth - sw) / 2;
+        } else {
+          sh = image.naturalWidth / targetRatio;
+          sy = (image.naturalHeight - sh) * focusY;
+          sy = Math.max(0, Math.min(image.naturalHeight - sh, sy));
+        }
+
+        context.drawImage(image, sx, sy, sw, sh, x, y, width, height);
+      }
+
+      async function loadSnapshotImage(rawUrl) {
+        if (!rawUrl) return null;
+
+        const dataUrl = await assetAsDataUrl(rawUrl);
+        if (!dataUrl || dataUrl === TRANSPARENT_PIXEL) return null;
+
+        return await new Promise((resolve, reject) => {
+          const image = new Image();
+          image.addEventListener('load', () => resolve(image), { once: true });
+          image.addEventListener('error', () => reject(new Error('Image de carte illisible')), { once: true });
+          image.src = dataUrl;
+        });
+      }
+
+      function canvasBlob(canvas) {
+        return new Promise((resolve, reject) => {
+          canvas.toBlob(
+            (blob) => blob ? resolve(blob) : reject(new Error('PNG impossible')),
+            'image/png'
+          );
+        });
+      }
+
+      function fitCanvasFont(context, text, maxWidth, maxSize, minSize, family, weight = 800) {
+        let size = maxSize;
+
+        while (size > minSize) {
+          context.font = `${weight} ${size}px ${family}`;
+          if (context.measureText(text).width <= maxWidth) break;
+          size -= 0.5;
+        }
+
+        return size;
+      }
+
+      function wrapCanvasText(context, text, maxWidth, maxLines = Infinity) {
+        const words = String(text || '').trim().split(/\s+/).filter(Boolean);
+        if (!words.length) return [];
+
+        const lines = [];
+        let line = '';
+
+        for (const word of words) {
+          const next = line ? `${line} ${word}` : word;
+
+          if (!line || context.measureText(next).width <= maxWidth) {
+            line = next;
+            continue;
+          }
+
+          lines.push(line);
+          line = word;
+
+          if (lines.length >= maxLines) break;
+        }
+
+        if (lines.length < maxLines && line) lines.push(line);
+
+        if (lines.length === maxLines && words.length) {
+          const consumed = lines.join(' ').split(/\s+/).length;
+          if (consumed < words.length) {
+            let last = lines[maxLines - 1];
+
+            while (last && context.measureText(last + '…').width > maxWidth) {
+              last = last.slice(0, -1);
+            }
+
+            lines[maxLines - 1] = last.replace(/[\s,.;:!?-]+$/g, '') + '…';
+          }
+        }
+
+        return lines;
+      }
+
+      function rarityOf(card) {
+        for (const rarity of ['L', 'UR', 'SR', 'R', 'PC', 'C']) {
+          if (card.classList.contains('glow-' + rarity.toLowerCase())) return rarity;
+        }
+
+        return (
+          card.querySelector('div[class*="top-2"][class*="left-2"]')?.textContent
+            ?.replace('✦', '')
+            ?.trim() ||
+          ''
+        );
+      }
+
+      function rarityAccent(rarity) {
+        return ({
+          L: '#ffd45a',
+          UR: '#ff9f43',
+          SR: '#c98cff',
+          R: '#64bfff',
+          PC: '#6ee7ad',
+          C: '#b7c1ce'
+        })[rarity] || '#b7c1ce';
+      }
+
+      function cardStat(card, selector) {
+        const icon = card.querySelector(selector);
+        if (!icon) return '';
+        const holder = icon.closest('div');
+        return holder?.textContent?.trim() || '';
+      }
+
       async function snapshotCard(card) {
-        const rect = card.getBoundingClientRect();
-        const width = Math.max(1, Math.round(rect.width));
-        const height = Math.max(1, Math.round(rect.height));
+        const cardRect = card.getBoundingClientRect();
+        const width = Math.max(1, Math.round(cardRect.width || 288));
+        const height = Math.max(1, Math.round(cardRect.height || 420));
         const scale = 2;
 
-        const clone = await cloneRenderedNode(card);
-        if (!(clone instanceof Element)) throw new Error('Carte impossible à copier');
+        const canvas = document.createElement('canvas');
+        canvas.width = width * scale;
+        canvas.height = height * scale;
 
-        clone.style.setProperty('transform', 'none', 'important');
-        clone.style.setProperty('margin', '0', 'important');
-        clone.style.setProperty('width', width + 'px', 'important');
-        clone.style.setProperty('height', height + 'px', 'important');
-        clone.style.setProperty('max-width', 'none', 'important');
-        clone.style.setProperty('max-height', 'none', 'important');
-        clone.style.setProperty('will-change', 'auto', 'important');
+        const context = canvas.getContext('2d');
+        if (!context) throw new Error('Canvas indisponible');
 
-        const wrapper = document.createElement('div');
-        wrapper.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml');
-        wrapper.style.width = width + 'px';
-        wrapper.style.height = height + 'px';
-        wrapper.style.margin = '0';
-        wrapper.style.padding = '0';
-        wrapper.append(clone);
+        context.scale(scale, scale);
 
-        const serialized = new XMLSerializer().serializeToString(wrapper);
-        const svg =
-          '<svg xmlns="http://www.w3.org/2000/svg" width="' + width + '" height="' + height + '">' +
-          '<foreignObject x="0" y="0" width="100%" height="100%">' +
-          serialized +
-          '</foreignObject></svg>';
+        const rarity = rarityOf(card);
+        const accent = rarityAccent(rarity);
+        const radius = 16;
 
-        const svgUrl = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml;charset=utf-8' }));
+        const titleElement = card.querySelector('h3');
+        const descriptionElement = card.querySelector('p');
+        const averageElement = card.querySelector('.wm-average-badge');
+        const artLayer = card.querySelector('div[class*="top-0"][class*="h-[45%]"]');
+        const artImage = artLayer?.querySelector('img') || null;
+        const fallbackTitle = card.querySelector('.wm-missing-title-art-text');
 
+        const artUrl =
+          artImage?.currentSrc ||
+          artImage?.src ||
+          String(card.style.getPropertyValue('--wm-art-url') || '')
+            .replace(/^\s*url\(["']?/, '')
+            .replace(/["']?\)\s*$/, '');
+
+        let image = null;
         try {
-          const image = await new Promise((resolve, reject) => {
-            const img = new Image();
-            img.addEventListener('load', () => resolve(img), { once: true });
-            img.addEventListener('error', () => reject(new Error('Rendu de la carte impossible')), { once: true });
-            img.src = svgUrl;
-          });
+          image = await loadSnapshotImage(artUrl);
+        } catch (error) {
+          console.debug('[WM Average] image ignorée pour le partage', error);
+        }
 
-          const canvas = document.createElement('canvas');
-          canvas.width = width * scale;
-          canvas.height = height * scale;
+        context.save();
+        roundedRectPath(context, 0, 0, width, height, radius);
+        context.clip();
 
-          const context = canvas.getContext('2d');
-          if (!context) throw new Error('Canvas indisponible');
+        // Fond full-art : image assombrie si disponible, sinon fond de rareté.
+        if (image) {
+          context.save();
+          context.filter = 'blur(10px) brightness(0.46) saturate(0.92)';
+          context.globalAlpha = 0.92;
+          drawImageCover(context, image, -10, -10, width + 20, height + 20, 0.42);
+          context.restore();
+        } else {
+          const background = context.createLinearGradient(0, 0, width, height);
+          background.addColorStop(0, '#242a34');
+          background.addColorStop(0.5, '#121722');
+          background.addColorStop(1, '#080a0e');
+          context.fillStyle = background;
+          context.fillRect(0, 0, width, height);
+        }
 
-          context.scale(scale, scale);
-          context.drawImage(image, 0, 0, width, height);
+        const darken = context.createLinearGradient(0, 0, 0, height);
+        darken.addColorStop(0, 'rgba(0,0,0,0.05)');
+        darken.addColorStop(0.42, 'rgba(0,0,0,0.12)');
+        darken.addColorStop(0.60, 'rgba(0,0,0,0.68)');
+        darken.addColorStop(1, 'rgba(0,0,0,0.94)');
+        context.fillStyle = darken;
+        context.fillRect(0, 0, width, height);
 
-          return await new Promise((resolve, reject) => {
-            canvas.toBlob(
-              (blob) => blob ? resolve(blob) : reject(new Error('PNG impossible')),
-              'image/png'
+        // Image principale au même emplacement que sur la carte affichée.
+        if (image && artLayer) {
+          const artRect = relativeRect(artLayer, cardRect);
+
+          if (artRect) {
+            context.save();
+            roundedRectPath(
+              context,
+              artRect.x,
+              artRect.y,
+              artRect.width,
+              Math.min(height - artRect.y, Math.max(artRect.height, height * 0.53)),
+              0
+            );
+            context.clip();
+
+            context.filter = 'none';
+            context.globalAlpha = 1;
+            drawImageCover(
+              context,
+              image,
+              artRect.x,
+              artRect.y,
+              artRect.width,
+              Math.min(height - artRect.y, Math.max(artRect.height, height * 0.53)),
+              parseObjectPositionY(artImage)
+            );
+
+            const fade = context.createLinearGradient(
+              0,
+              artRect.y + artRect.height * 0.55,
+              0,
+              artRect.y + Math.max(artRect.height, height * 0.53)
+            );
+            fade.addColorStop(0, 'rgba(0,0,0,0)');
+            fade.addColorStop(1, 'rgba(8,10,14,0.96)');
+            context.fillStyle = fade;
+            context.fillRect(
+              artRect.x,
+              artRect.y,
+              artRect.width,
+              Math.min(height - artRect.y, Math.max(artRect.height, height * 0.53))
+            );
+            context.restore();
+          }
+        } else if (fallbackTitle) {
+          context.save();
+          const glow = context.createRadialGradient(
+            width * 0.35, height * 0.20, 0,
+            width * 0.35, height * 0.20, width * 0.72
+          );
+          glow.addColorStop(0, accent + '55');
+          glow.addColorStop(1, 'rgba(0,0,0,0)');
+          context.fillStyle = glow;
+          context.fillRect(0, 0, width, height * 0.60);
+
+          const fallbackText = fallbackTitle.textContent?.trim() || titleElement?.textContent?.trim() || '';
+          const family = getComputedStyle(fallbackTitle).fontFamily || 'sans-serif';
+          const size = fitCanvasFont(context, fallbackText, width - 42, 38, 12, family, 900);
+          context.font = `900 ${size}px ${family}`;
+          context.fillStyle = accent;
+          context.textAlign = 'center';
+          context.textBaseline = 'middle';
+          context.shadowColor = 'rgba(0,0,0,0.82)';
+          context.shadowBlur = 10;
+          context.fillText(fallbackText, width / 2, height * 0.29);
+          context.restore();
+        }
+
+        // Badge rareté.
+        context.save();
+        context.font = '900 10px sans-serif';
+        const rarityWidth = Math.max(30, context.measureText(rarity).width + 14);
+        roundedRectPath(context, 10, 10, rarityWidth, 22, 8);
+        context.fillStyle = accent;
+        context.fill();
+        context.fillStyle = '#111318';
+        context.textAlign = 'center';
+        context.textBaseline = 'middle';
+        context.fillText(rarity, 10 + rarityWidth / 2, 21);
+        context.restore();
+
+        // Titre principal.
+        const title = titleElement?.textContent?.trim() || '';
+        const titleRect = relativeRect(titleElement, cardRect);
+        if (title) {
+          const family = titleElement
+            ? getComputedStyle(titleElement).fontFamily
+            : 'sans-serif';
+          const x = titleRect ? Math.max(12, titleRect.x) : 14;
+          const y = titleRect ? titleRect.y : height * 0.67;
+          const maxWidth = titleRect?.width || width - x - 14;
+          const size = fitCanvasFont(context, title, maxWidth, 17, 10, family, 900);
+
+          context.save();
+          context.font = `900 ${size}px ${family}`;
+          context.fillStyle = accent;
+          context.textAlign = 'left';
+          context.textBaseline = 'top';
+          context.shadowColor = 'rgba(0,0,0,0.9)';
+          context.shadowBlur = 3;
+          context.fillText(title, x, y);
+          context.restore();
+        }
+
+        // Prix moyen.
+        if (averageElement && averageElement.offsetParent !== null) {
+          const averageText = averageElement.textContent?.trim() || '';
+          const rect = relativeRect(averageElement, cardRect);
+
+          if (averageText && rect) {
+            context.save();
+            context.font = '800 9px sans-serif';
+            const pillWidth = Math.max(rect.width, context.measureText(averageText).width + 14);
+            const pillHeight = Math.max(18, rect.height);
+            roundedRectPath(context, rect.x, rect.y, pillWidth, pillHeight, pillHeight / 2);
+            context.fillStyle = 'rgba(6, 95, 70, 0.92)';
+            context.fill();
+            context.strokeStyle = 'rgba(110, 231, 173, 0.72)';
+            context.lineWidth = 1;
+            context.stroke();
+            context.fillStyle = '#d1fae5';
+            context.textBaseline = 'middle';
+            context.textAlign = 'center';
+            context.fillText(averageText, rect.x + pillWidth / 2, rect.y + pillHeight / 2);
+            context.restore();
+          }
+        }
+
+        // Description avec le même espace réel que la carte.
+        const description = descriptionElement?.textContent?.trim() || '';
+        const descriptionRect = relativeRect(descriptionElement, cardRect);
+        if (description && descriptionRect) {
+          const style = getComputedStyle(descriptionElement);
+          const fontSize = Math.max(8, Math.min(10.5, Number.parseFloat(style.fontSize) || 10));
+          const lineHeight = Math.max(fontSize * 1.15, Number.parseFloat(style.lineHeight) || fontSize * 1.22);
+          const family = style.fontFamily || 'sans-serif';
+          const maxLines = Math.max(1, Math.floor(descriptionRect.height / lineHeight));
+
+          context.save();
+          context.font = `500 ${fontSize}px ${family}`;
+          context.fillStyle = 'rgba(255,255,255,0.88)';
+          context.textAlign = 'left';
+          context.textBaseline = 'top';
+
+          const lines = wrapCanvasText(
+            context,
+            description,
+            descriptionRect.width,
+            maxLines
+          );
+
+          lines.forEach((line, index) => {
+            context.fillText(
+              line,
+              descriptionRect.x,
+              descriptionRect.y + index * lineHeight
             );
           });
-        } finally {
-          URL.revokeObjectURL(svgUrl);
+          context.restore();
         }
+
+        // Stats si elles sont visibles.
+        const statsHidden = document.documentElement.classList.contains('wm-hide-card-stats');
+        if (!statsHidden) {
+          const attack = cardStat(card, 'svg.lucide-swords');
+          const defense = cardStat(card, 'svg.lucide-shield');
+
+          if (attack || defense) {
+            const statsY = height - 24;
+            context.save();
+            context.font = '800 10px sans-serif';
+            context.textBaseline = 'middle';
+
+            if (attack) {
+              context.fillStyle = '#f87171';
+              context.textAlign = 'left';
+              context.fillText('ATK', 14, statsY);
+              context.fillStyle = '#ffffff';
+              context.fillText(attack, 38, statsY);
+            }
+
+            if (defense) {
+              const valueWidth = context.measureText(defense).width;
+              context.fillStyle = '#93c5fd';
+              context.textAlign = 'right';
+              context.fillText('DEF', width - valueWidth - 20, statsY);
+              context.fillStyle = '#ffffff';
+              context.fillText(defense, width - 14, statsY);
+            }
+
+            context.restore();
+          }
+        }
+
+        // Bordure rareté.
+        context.restore();
+        context.save();
+        roundedRectPath(context, 1, 1, width - 2, height - 2, radius - 1);
+        context.strokeStyle = accent;
+        context.lineWidth = 2;
+        context.shadowColor = accent + '66';
+        context.shadowBlur = 8;
+        context.stroke();
+        context.restore();
+
+        return await canvasBlob(canvas);
       }
 
       function setCopyState(button, state) {
@@ -373,8 +752,7 @@
         button.setAttribute('aria-label', aria);
       }
 
-      function requestCardCapture(card) {
-        const rect = card.getBoundingClientRect();
+      function requestClipboardWrite(dataUrl) {
         const requestId =
           'wm-copy-' +
           Date.now().toString(36) +
@@ -413,16 +791,9 @@
           window.addEventListener('message', onMessage);
           window.postMessage({
             source: 'wm-average-page',
-            type: 'capture-card-image',
+            type: 'copy-card-image',
             requestId,
-            rect: {
-              left: rect.left,
-              top: rect.top,
-              right: rect.right,
-              bottom: rect.bottom,
-              width: rect.width,
-              height: rect.height
-            }
+            dataUrl
           }, '*');
         });
       }
@@ -443,23 +814,16 @@
           if (!event.isTrusted || button.dataset.wmCopyState === 'busy') return;
 
           setCopyState(button, 'busy');
-          card.classList.add('wm-copy-capturing');
 
           try {
-            // Deux frames laissent le temps au navigateur de masquer les contrôles
-            // avant la capture réelle de l'onglet.
-            await new Promise((resolve) => requestAnimationFrame(() => {
-              requestAnimationFrame(resolve);
-            }));
-
-            await requestCardCapture(card);
+            const blob = await snapshotCard(card);
+            const dataUrl = await blobToDataUrl(blob);
+            await requestClipboardWrite(dataUrl);
             setCopyState(button, 'done');
           } catch (error) {
             console.error('[WM Average] copie image impossible', error);
             setCopyState(button, 'failed');
             button.title = 'Échec : ' + String(error?.message || error);
-          } finally {
-            card.classList.remove('wm-copy-capturing');
           }
 
           setTimeout(() => setCopyState(button, 'idle'), 1800);
