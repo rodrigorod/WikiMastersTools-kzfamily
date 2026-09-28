@@ -54,6 +54,7 @@ Puis cliquer sur **Recharger** dans `chrome://extensions/` et faire un F5 sur Wi
 
 - **29/09/2026** — Ajout de la défausse par prix dans la collection : filtrage par étiquettes (dont « Sans étiquette uniquement »), sélection par rareté, défausse directe en masse via l'API WikiMasters (`/api/user-cards/bulk-discard`) et protection des exemplaires uniques.
 - **28/09/2026** — Ajout du bouton « Cartes GIF » dans l’onglet collection pour trouver et filtrer les cartes avec une image animée GIF.
+- **28/09/2026** — Correction de l’ouverture automatique des paquets.
 - **28/09/2026** — Intervalle personnalisable pour l’ouverture automatique des paquets.
 - **27/09/2026** — Amélioration des performances de la collection.
 - **27/09/2026** — Mise à jour du style des cartes.
