@@ -1024,6 +1024,369 @@
         return await canvasBlob(canvas);
       }
 
+      function blobToSnapshotImage(blob) {
+        return new Promise((resolve, reject) => {
+          const url = URL.createObjectURL(blob);
+          const image = new Image();
+
+          image.addEventListener('load', () => {
+            URL.revokeObjectURL(url);
+            resolve(image);
+          }, { once: true });
+
+          image.addEventListener('error', () => {
+            URL.revokeObjectURL(url);
+            reject(new Error('Aperçu du paquet impossible'));
+          }, { once: true });
+
+          image.src = url;
+        });
+      }
+
+      function findPullOpeningState() {
+        if (!location.pathname.startsWith('/pull')) return null;
+
+        const main = document.querySelector('main');
+        if (!main) return null;
+
+        const flip = main.querySelector('.animate-card-flip');
+        const card =
+          [...(flip?.querySelectorAll('div[class*="glow-"]') || [])]
+            .find((candidate) => candidate.querySelector('h3')) ||
+          [...main.querySelectorAll('div[class*="glow-"]')]
+            .find((candidate) => candidate.querySelector('h3'));
+
+        if (!card) return null;
+
+        let stage = flip?.parentElement?.parentElement || card.parentElement;
+
+        while (
+          stage &&
+          stage !== main &&
+          !/Carte\s*\d+\s*\/\s*\d+/i.test(stage.textContent || '')
+        ) {
+          stage = stage.parentElement;
+        }
+
+        if (!stage || stage === main) return null;
+
+        const counterMatch = (stage.textContent || '').match(
+          /Carte\s*(\d+)\s*\/\s*(\d+)/i
+        );
+
+        if (!counterMatch) return null;
+
+        const current = Math.max(1, Number(counterMatch[1]) || 1);
+        const total = Math.max(current, Number(counterMatch[2]) || current);
+
+        const directChildren = [...stage.children];
+
+        const navigation =
+          directChildren.find((child) => {
+            const buttons = child.querySelectorAll?.(':scope > button');
+            return buttons && buttons.length >= 2 && child.querySelectorAll('button').length >= 3;
+          }) || null;
+
+        const actionButton =
+          directChildren.find((child) =>
+            child instanceof HTMLButtonElement &&
+            !child.classList.contains('wm-pull-share-button')
+          ) || null;
+
+        return {
+          card,
+          stage,
+          navigation,
+          actionButton,
+          current,
+          total
+        };
+      }
+
+      function pullShareAccent(state) {
+        const actionColor = state.actionButton
+          ? getComputedStyle(state.actionButton).backgroundColor
+          : '';
+
+        if (
+          actionColor &&
+          actionColor !== 'rgba(0, 0, 0, 0)' &&
+          actionColor !== 'transparent'
+        ) {
+          return actionColor;
+        }
+
+        const activeDot =
+          state.navigation
+            ? [...state.navigation.querySelectorAll('button')]
+                .find((button) => button.className.includes('scale-125'))
+            : null;
+
+        const dotColor = activeDot
+          ? getComputedStyle(activeDot).backgroundColor
+          : '';
+
+        return (
+          dotColor &&
+          dotColor !== 'rgba(0, 0, 0, 0)' &&
+          dotColor !== 'transparent'
+        )
+          ? dotColor
+          : '#34d399';
+      }
+
+      function drawPullChevron(context, x, y, direction) {
+        context.save();
+        context.strokeStyle = '#f2f5f4';
+        context.lineWidth = 3;
+        context.lineCap = 'round';
+        context.lineJoin = 'round';
+        context.beginPath();
+
+        if (direction < 0) {
+          context.moveTo(x + 4, y - 8);
+          context.lineTo(x - 4, y);
+          context.lineTo(x + 4, y + 8);
+        } else {
+          context.moveTo(x - 4, y - 8);
+          context.lineTo(x + 4, y);
+          context.lineTo(x - 4, y + 8);
+        }
+
+        context.stroke();
+        context.restore();
+      }
+
+      async function snapshotPullOpening(state) {
+        const width = 432;
+        const height = 872;
+        const scale = 2;
+        const canvas = document.createElement('canvas');
+        canvas.width = width * scale;
+        canvas.height = height * scale;
+
+        const context = canvas.getContext('2d');
+        if (!context) throw new Error('Canvas indisponible');
+
+        context.scale(scale, scale);
+        context.fillStyle = '#080a09';
+        context.fillRect(0, 0, width, height);
+
+        const accent = pullShareAccent(state);
+
+        // Compteur "Carte X / N".
+        context.save();
+        context.textAlign = 'left';
+        context.textBaseline = 'middle';
+
+        const label = 'Carte';
+        const currentText = String(state.current);
+        const totalText = '/ ' + state.total;
+
+        context.font = '600 16px sans-serif';
+        const labelWidth = context.measureText(label).width;
+        context.font = '800 22px sans-serif';
+        const currentWidth = context.measureText(currentText).width;
+        context.font = '600 16px sans-serif';
+        const totalWidth = context.measureText(totalText).width;
+
+        const gap1 = 9;
+        const gap2 = 9;
+        const groupWidth =
+          labelWidth + gap1 + currentWidth + gap2 + totalWidth;
+        let cursorX = (width - groupWidth) / 2;
+        const counterY = 36;
+
+        context.font = '600 16px sans-serif';
+        context.fillStyle = 'rgba(255,255,255,0.42)';
+        context.fillText(label, cursorX, counterY);
+        cursorX += labelWidth + gap1;
+
+        context.font = '800 22px sans-serif';
+        context.fillStyle = accent;
+        context.fillText(currentText, cursorX, counterY);
+        cursorX += currentWidth + gap2;
+
+        context.font = '600 16px sans-serif';
+        context.fillStyle = 'rgba(255,255,255,0.42)';
+        context.fillText(totalText, cursorX, counterY);
+        context.restore();
+
+        // Carte : on réutilise exactement le renderer du bouton Partager.
+        const cardBlob = await snapshotCard(state.card);
+        const cardImage = await blobToSnapshotImage(cardBlob);
+        const cardWidth = 324;
+        const cardHeight = 456;
+        context.drawImage(
+          cardImage,
+          (width - cardWidth) / 2,
+          62,
+          cardWidth,
+          cardHeight
+        );
+
+        // Navigation.
+        const navigationY = 622;
+        const arrowRadius = 30;
+
+        for (const [x, direction] of [[108, -1], [324, 1]]) {
+          context.save();
+          context.beginPath();
+          context.arc(x, navigationY, arrowRadius, 0, Math.PI * 2);
+          context.fillStyle = '#171c1b';
+          context.fill();
+          context.strokeStyle = '#29302f';
+          context.lineWidth = 1;
+          context.stroke();
+          context.restore();
+          drawPullChevron(context, x, navigationY, direction);
+        }
+
+        const dotCount = Math.max(1, state.total);
+        const dotSpacing = dotCount > 1
+          ? Math.min(21, 105 / (dotCount - 1))
+          : 0;
+        const dotsWidth = (dotCount - 1) * dotSpacing;
+        const firstDotX = width / 2 - dotsWidth / 2;
+
+        for (let index = 0; index < dotCount; index += 1) {
+          context.beginPath();
+          context.arc(
+            firstDotX + index * dotSpacing,
+            navigationY,
+            7.5,
+            0,
+            Math.PI * 2
+          );
+          context.fillStyle =
+            index === state.current - 1
+              ? accent
+              : 'rgba(255,255,255,0.28)';
+          context.fill();
+        }
+
+        // Bouton d'action de l'ouverture, sans inclure le bouton Partager.
+        const rawAction =
+          state.actionButton?.textContent?.trim() ||
+          (state.current >= state.total ? 'Continuer' : 'Continuer');
+        const actionText = rawAction.replace(/\s+/g, ' ');
+        const buttonWidth = Math.max(
+          176,
+          Math.min(250, 84 + actionText.length * 7.2)
+        );
+        const buttonHeight = 58;
+        const buttonX = (width - buttonWidth) / 2;
+        const buttonY = 690;
+
+        context.save();
+        roundedRectPath(
+          context,
+          buttonX,
+          buttonY,
+          buttonWidth,
+          buttonHeight,
+          15
+        );
+        context.fillStyle = accent;
+        context.fill();
+
+        context.fillStyle = '#07392f';
+        context.font = '800 18px sans-serif';
+        context.textAlign = 'center';
+        context.textBaseline = 'middle';
+        context.fillText(
+          actionText,
+          width / 2,
+          buttonY + buttonHeight / 2 + 1
+        );
+        context.restore();
+
+        return await canvasBlob(canvas);
+      }
+
+      function setPullShareState(button, state) {
+        button.dataset.wmPullShareState = state;
+        button.textContent =
+          state === 'done' ? 'Copiée ✓' :
+          state === 'failed' ? 'Échec' :
+          state === 'busy' ? 'Partage…' :
+          'Partager';
+      }
+
+      function installPullShareButton(openingState) {
+        let button = document.querySelector('.wm-pull-share-button');
+
+        if (button && button.parentElement !== openingState.stage) {
+          button.remove();
+          button = null;
+        }
+
+        if (button) return;
+
+        button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'wm-pull-share-button';
+        setPullShareState(button, 'idle');
+
+        button.addEventListener('click', async (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+
+          if (!event.isTrusted || button.dataset.wmPullShareState === 'busy') {
+            return;
+          }
+
+          const currentState = findPullOpeningState();
+          if (!currentState) return;
+
+          setPullShareState(button, 'busy');
+
+          try {
+            const blob = await snapshotPullOpening(currentState);
+            const dataUrl = await blobToDataUrl(blob);
+            await requestClipboardWrite(dataUrl);
+            setPullShareState(button, 'done');
+          } catch (error) {
+            console.error('[WM Average] partage du paquet impossible', error);
+            setPullShareState(button, 'failed');
+            button.title =
+              'Échec : ' + String(error?.message || error);
+          }
+
+          setTimeout(() => {
+            if (button.isConnected) setPullShareState(button, 'idle');
+          }, 1800);
+        });
+
+        if (
+          openingState.actionButton &&
+          openingState.actionButton.parentElement === openingState.stage
+        ) {
+          openingState.stage.insertBefore(
+            button,
+            openingState.actionButton
+          );
+        } else {
+          openingState.stage.append(button);
+        }
+      }
+
+      function syncPullShareButton() {
+        if (!isEnabled('copyCardImage')) {
+          document.querySelector('.wm-pull-share-button')?.remove();
+          return;
+        }
+
+        const openingState = findPullOpeningState();
+
+        if (!openingState) {
+          document.querySelector('.wm-pull-share-button')?.remove();
+          return;
+        }
+
+        installPullShareButton(openingState);
+      }
+
       function setCopyState(button, state) {
         button.dataset.wmCopyState = state;
 
@@ -1164,6 +1527,7 @@
         syncHiddenStats();
         syncNotificationSound();
         syncCopyButtons();
+        syncPullShareButton();
       }
 
       return { render };

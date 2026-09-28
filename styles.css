@@ -2841,6 +2841,47 @@ div[class*="glow-"]:has(> div[class*="top-0"][class*="h-[45%]"] img):has(h3):not
   color: #fecaca;
 }
 
+.wm-pull-share-button {
+  min-width: 104px;
+  height: 36px;
+  padding: 0 16px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 999px;
+  background: rgba(18, 22, 21, 0.94);
+  color: rgba(255, 255, 255, 0.92);
+  box-shadow:
+    0 5px 16px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  transition:
+    transform 140ms ease,
+    border-color 140ms ease,
+    background 140ms ease;
+}
+
+.wm-pull-share-button:hover {
+  transform: translateY(-1px);
+  border-color: rgba(52, 211, 153, 0.68);
+  background: rgba(20, 35, 31, 0.96);
+}
+
+.wm-pull-share-button[data-wm-pull-share-state="done"] {
+  border-color: rgba(110, 231, 183, 0.82);
+  background: rgba(6, 78, 59, 0.92);
+  color: #a7f3d0;
+}
+
+.wm-pull-share-button[data-wm-pull-share-state="failed"] {
+  border-color: rgba(248, 113, 113, 0.82);
+  background: rgba(69, 10, 10, 0.92);
+  color: #fecaca;
+}
+
 .wm-copy-capturing button,
 .wm-copy-capturing .wm-wikipedia-card-button,
 .wm-copy-capturing .wm-missing-image-credit {
