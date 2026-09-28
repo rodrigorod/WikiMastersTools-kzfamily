@@ -438,6 +438,7 @@
         const width = Math.max(1, Math.round(cardRect.width || 288));
         const height = Math.max(1, Math.round(cardRect.height || 420));
         const scale = 2;
+        const isPremium = card.classList.contains('wm-premium-card');
 
         const canvas = document.createElement('canvas');
         canvas.width = width * scale;
@@ -458,6 +459,9 @@
         const artLayer = card.querySelector('div[class*="top-0"][class*="h-[45%]"]');
         const artImage = artLayer?.querySelector('img') || null;
         const fallbackTitle = card.querySelector('.wm-missing-title-art-text');
+        const nativeBackgroundImage = !isPremium
+          ? card.querySelector(':scope > img')
+          : null;
 
         const artUrl =
           artImage?.currentSrc ||
@@ -466,108 +470,212 @@
             .replace(/^\s*url\(["']?/, '')
             .replace(/["']?\)\s*$/, '');
 
+        const nativeBackgroundUrl =
+          nativeBackgroundImage?.currentSrc ||
+          nativeBackgroundImage?.src ||
+          '';
+
         let image = null;
+        let nativeBackground = null;
+
         try {
           image = await loadSnapshotImage(artUrl);
         } catch (error) {
           console.debug('[WM Average] image ignorée pour le partage', error);
         }
 
+        if (!isPremium && nativeBackgroundUrl) {
+          try {
+            nativeBackground = await loadSnapshotImage(nativeBackgroundUrl);
+          } catch (error) {
+            console.debug('[WM Average] fond WikiMasters ignoré pour le partage', error);
+          }
+        }
+
         context.save();
         roundedRectPath(context, 0, 0, width, height, radius);
         context.clip();
 
-        // Fond full-art : image assombrie si disponible, sinon fond de rareté.
-        if (image) {
-          context.save();
-          context.filter = 'blur(10px) brightness(0.46) saturate(0.92)';
-          context.globalAlpha = 0.92;
-          drawImageCover(context, image, -10, -10, width + 20, height + 20, 0.42);
-          context.restore();
-        } else {
-          const background = context.createLinearGradient(0, 0, width, height);
-          background.addColorStop(0, '#242a34');
-          background.addColorStop(0.5, '#121722');
-          background.addColorStop(1, '#080a0e');
-          context.fillStyle = background;
-          context.fillRect(0, 0, width, height);
-        }
-
-        const darken = context.createLinearGradient(0, 0, 0, height);
-        darken.addColorStop(0, 'rgba(0,0,0,0.05)');
-        darken.addColorStop(0.42, 'rgba(0,0,0,0.12)');
-        darken.addColorStop(0.60, 'rgba(0,0,0,0.68)');
-        darken.addColorStop(1, 'rgba(0,0,0,0.94)');
-        context.fillStyle = darken;
-        context.fillRect(0, 0, width, height);
-
-        // Image principale au même emplacement que sur la carte affichée.
-        if (image && artLayer) {
-          const artRect = relativeRect(artLayer, cardRect);
-
-          if (artRect) {
+        if (isPremium) {
+          // Design full-art de l'extension.
+          if (image) {
             context.save();
-            roundedRectPath(
-              context,
-              artRect.x,
-              artRect.y,
-              artRect.width,
-              Math.min(height - artRect.y, Math.max(artRect.height, height * 0.53)),
-              0
-            );
-            context.clip();
+            context.filter = 'blur(10px) brightness(0.46) saturate(0.92)';
+            context.globalAlpha = 0.92;
+            drawImageCover(context, image, -10, -10, width + 20, height + 20, 0.42);
+            context.restore();
+          } else {
+            const background = context.createLinearGradient(0, 0, width, height);
+            background.addColorStop(0, '#242a34');
+            background.addColorStop(0.5, '#121722');
+            background.addColorStop(1, '#080a0e');
+            context.fillStyle = background;
+            context.fillRect(0, 0, width, height);
+          }
 
-            context.filter = 'none';
-            context.globalAlpha = 1;
-            drawImageCover(
+          const darken = context.createLinearGradient(0, 0, 0, height);
+          darken.addColorStop(0, 'rgba(0,0,0,0.05)');
+          darken.addColorStop(0.42, 'rgba(0,0,0,0.12)');
+          darken.addColorStop(0.60, 'rgba(0,0,0,0.68)');
+          darken.addColorStop(1, 'rgba(0,0,0,0.94)');
+          context.fillStyle = darken;
+          context.fillRect(0, 0, width, height);
+
+          if (image && artLayer) {
+            const artRect = relativeRect(artLayer, cardRect);
+
+            if (artRect) {
+              const extendedHeight = Math.min(
+                height - artRect.y,
+                Math.max(artRect.height, height * 0.53)
+              );
+
+              context.save();
+              context.rect(artRect.x, artRect.y, artRect.width, extendedHeight);
+              context.clip();
+
+              context.filter = 'none';
+              context.globalAlpha = 1;
+              drawImageCover(
+                context,
+                image,
+                artRect.x,
+                artRect.y,
+                artRect.width,
+                extendedHeight,
+                parseObjectPositionY(artImage)
+              );
+
+              const fade = context.createLinearGradient(
+                0,
+                artRect.y + artRect.height * 0.55,
+                0,
+                artRect.y + extendedHeight
+              );
+              fade.addColorStop(0, 'rgba(0,0,0,0)');
+              fade.addColorStop(1, 'rgba(8,10,14,0.96)');
+              context.fillStyle = fade;
+              context.fillRect(
+                artRect.x,
+                artRect.y,
+                artRect.width,
+                extendedHeight
+              );
+              context.restore();
+            }
+          } else if (fallbackTitle) {
+            context.save();
+            const glow = context.createRadialGradient(
+              width * 0.35, height * 0.20, 0,
+              width * 0.35, height * 0.20, width * 0.72
+            );
+            glow.addColorStop(0, accent + '55');
+            glow.addColorStop(1, 'rgba(0,0,0,0)');
+            context.fillStyle = glow;
+            context.fillRect(0, 0, width, height * 0.60);
+
+            const fallbackText =
+              fallbackTitle.textContent?.trim() ||
+              titleElement?.textContent?.trim() ||
+              '';
+            const family = getComputedStyle(fallbackTitle).fontFamily || 'sans-serif';
+            const size = fitCanvasFont(
               context,
-              image,
-              artRect.x,
-              artRect.y,
-              artRect.width,
-              Math.min(height - artRect.y, Math.max(artRect.height, height * 0.53)),
-              parseObjectPositionY(artImage)
+              fallbackText,
+              width - 42,
+              38,
+              12,
+              family,
+              900
             );
 
-            const fade = context.createLinearGradient(
-              0,
-              artRect.y + artRect.height * 0.55,
-              0,
-              artRect.y + Math.max(artRect.height, height * 0.53)
-            );
-            fade.addColorStop(0, 'rgba(0,0,0,0)');
-            fade.addColorStop(1, 'rgba(8,10,14,0.96)');
-            context.fillStyle = fade;
-            context.fillRect(
-              artRect.x,
-              artRect.y,
-              artRect.width,
-              Math.min(height - artRect.y, Math.max(artRect.height, height * 0.53))
-            );
+            context.font = `900 ${size}px ${family}`;
+            context.fillStyle = accent;
+            context.textAlign = 'center';
+            context.textBaseline = 'middle';
+            context.shadowColor = 'rgba(0,0,0,0.82)';
+            context.shadowBlur = 10;
+            context.fillText(fallbackText, width / 2, height * 0.29);
             context.restore();
           }
-        } else if (fallbackTitle) {
-          context.save();
-          const glow = context.createRadialGradient(
-            width * 0.35, height * 0.20, 0,
-            width * 0.35, height * 0.20, width * 0.72
-          );
-          glow.addColorStop(0, accent + '55');
-          glow.addColorStop(1, 'rgba(0,0,0,0)');
-          context.fillStyle = glow;
-          context.fillRect(0, 0, width, height * 0.60);
+        } else {
+          // Design WikiMasters natif : on réutilise son vrai fond de rareté.
+          if (nativeBackground) {
+            context.save();
 
-          const fallbackText = fallbackTitle.textContent?.trim() || titleElement?.textContent?.trim() || '';
-          const family = getComputedStyle(fallbackTitle).fontFamily || 'sans-serif';
-          const size = fitCanvasFont(context, fallbackText, width - 42, 38, 12, family, 900);
-          context.font = `900 ${size}px ${family}`;
-          context.fillStyle = accent;
-          context.textAlign = 'center';
-          context.textBaseline = 'middle';
-          context.shadowColor = 'rgba(0,0,0,0.82)';
-          context.shadowBlur = 10;
-          context.fillText(fallbackText, width / 2, height * 0.29);
-          context.restore();
+            // Le fond natif possède scale-[1.8]. On reproduit ce zoom en
+            // recadrant davantage l'image source autour de son centre.
+            const zoom = 1.8;
+            const sourceWidth = nativeBackground.naturalWidth / zoom;
+            const sourceHeight = nativeBackground.naturalHeight / zoom;
+            const sx = (nativeBackground.naturalWidth - sourceWidth) / 2;
+            const sy = (nativeBackground.naturalHeight - sourceHeight) / 2;
+
+            context.drawImage(
+              nativeBackground,
+              sx,
+              sy,
+              sourceWidth,
+              sourceHeight,
+              0,
+              0,
+              width,
+              height
+            );
+            context.restore();
+          } else {
+            const fallback = context.createLinearGradient(0, 0, 0, height);
+            fallback.addColorStop(0, '#f1e5cf');
+            fallback.addColorStop(1, '#d7c5aa');
+            context.fillStyle = fallback;
+            context.fillRect(0, 0, width, height);
+          }
+
+          // Léger voile supérieur présent sur la carte native.
+          const topShade = context.createLinearGradient(0, 0, 0, height * 0.42);
+          topShade.addColorStop(0, 'rgba(0,0,0,0.10)');
+          topShade.addColorStop(1, 'rgba(0,0,0,0)');
+          context.fillStyle = topShade;
+          context.fillRect(0, 0, width, height * 0.42);
+
+          // Photo strictement dans la zone 45 % du design original.
+          if (image && artLayer) {
+            const artRect = relativeRect(artLayer, cardRect);
+
+            if (artRect) {
+              context.save();
+              context.rect(artRect.x, artRect.y, artRect.width, artRect.height);
+              context.clip();
+
+              drawImageCover(
+                context,
+                image,
+                artRect.x,
+                artRect.y,
+                artRect.width,
+                artRect.height,
+                parseObjectPositionY(artImage)
+              );
+
+              const nativeFadeHeight = Math.min(48, artRect.height * 0.32);
+              const nativeFade = context.createLinearGradient(
+                0,
+                artRect.y + artRect.height - nativeFadeHeight,
+                0,
+                artRect.y + artRect.height
+              );
+              nativeFade.addColorStop(0, 'rgba(0,0,0,0)');
+              nativeFade.addColorStop(1, 'rgba(0,0,0,0.50)');
+              context.fillStyle = nativeFade;
+              context.fillRect(
+                artRect.x,
+                artRect.y + artRect.height - nativeFadeHeight,
+                artRect.width,
+                nativeFadeHeight
+              );
+              context.restore();
+            }
+          }
         }
 
         // Badge rareté.
@@ -583,25 +691,38 @@
         context.fillText(rarity, 10 + rarityWidth / 2, 21);
         context.restore();
 
-        // Titre principal.
+        // Titre : couleur rareté en full-art, vraie couleur DOM en natif.
         const title = titleElement?.textContent?.trim() || '';
         const titleRect = relativeRect(titleElement, cardRect);
+
         if (title) {
-          const family = titleElement
-            ? getComputedStyle(titleElement).fontFamily
-            : 'sans-serif';
+          const titleStyle = getComputedStyle(titleElement);
+          const family = titleStyle.fontFamily || 'sans-serif';
           const x = titleRect ? Math.max(12, titleRect.x) : 14;
           const y = titleRect ? titleRect.y : height * 0.67;
           const maxWidth = titleRect?.width || width - x - 14;
-          const size = fitCanvasFont(context, title, maxWidth, 17, 10, family, 900);
+          const nativeFontSize = Number.parseFloat(titleStyle.fontSize) || 16;
+          const size = fitCanvasFont(
+            context,
+            title,
+            maxWidth,
+            isPremium ? 17 : nativeFontSize,
+            9,
+            family,
+            900
+          );
 
           context.save();
           context.font = `900 ${size}px ${family}`;
-          context.fillStyle = accent;
+          context.fillStyle = isPremium ? accent : titleStyle.color;
           context.textAlign = 'left';
           context.textBaseline = 'top';
-          context.shadowColor = 'rgba(0,0,0,0.9)';
-          context.shadowBlur = 3;
+
+          if (isPremium) {
+            context.shadowColor = 'rgba(0,0,0,0.9)';
+            context.shadowBlur = 3;
+          }
+
           context.fillText(title, x, y);
           context.restore();
         }
@@ -612,37 +733,74 @@
           const rect = relativeRect(averageElement, cardRect);
 
           if (averageText && rect) {
+            const averageStyle = getComputedStyle(averageElement);
+
             context.save();
             context.font = '800 9px sans-serif';
-            const pillWidth = Math.max(rect.width, context.measureText(averageText).width + 14);
+            const pillWidth = Math.max(
+              rect.width,
+              context.measureText(averageText).width + 14
+            );
             const pillHeight = Math.max(18, rect.height);
-            roundedRectPath(context, rect.x, rect.y, pillWidth, pillHeight, pillHeight / 2);
-            context.fillStyle = 'rgba(6, 95, 70, 0.92)';
+
+            roundedRectPath(
+              context,
+              rect.x,
+              rect.y,
+              pillWidth,
+              pillHeight,
+              pillHeight / 2
+            );
+
+            context.fillStyle =
+              averageStyle.backgroundColor &&
+              averageStyle.backgroundColor !== 'rgba(0, 0, 0, 0)'
+                ? averageStyle.backgroundColor
+                : 'rgba(6, 95, 70, 0.92)';
             context.fill();
+
             context.strokeStyle = 'rgba(110, 231, 173, 0.72)';
             context.lineWidth = 1;
             context.stroke();
-            context.fillStyle = '#d1fae5';
+
+            context.fillStyle =
+              averageStyle.color || '#d1fae5';
             context.textBaseline = 'middle';
             context.textAlign = 'center';
-            context.fillText(averageText, rect.x + pillWidth / 2, rect.y + pillHeight / 2);
+            context.fillText(
+              averageText,
+              rect.x + pillWidth / 2,
+              rect.y + pillHeight / 2
+            );
             context.restore();
           }
         }
 
-        // Description avec le même espace réel que la carte.
+        // Description : reprend la couleur, police et zone réelles du DOM.
         const description = descriptionElement?.textContent?.trim() || '';
         const descriptionRect = relativeRect(descriptionElement, cardRect);
+
         if (description && descriptionRect) {
           const style = getComputedStyle(descriptionElement);
-          const fontSize = Math.max(8, Math.min(10.5, Number.parseFloat(style.fontSize) || 10));
-          const lineHeight = Math.max(fontSize * 1.15, Number.parseFloat(style.lineHeight) || fontSize * 1.22);
+          const fontSize = Math.max(
+            8,
+            Math.min(10.5, Number.parseFloat(style.fontSize) || 10)
+          );
+          const lineHeight = Math.max(
+            fontSize * 1.15,
+            Number.parseFloat(style.lineHeight) || fontSize * 1.22
+          );
           const family = style.fontFamily || 'sans-serif';
-          const maxLines = Math.max(1, Math.floor(descriptionRect.height / lineHeight));
+          const maxLines = Math.max(
+            1,
+            Math.floor(descriptionRect.height / lineHeight)
+          );
 
           context.save();
           context.font = `500 ${fontSize}px ${family}`;
-          context.fillStyle = 'rgba(255,255,255,0.88)';
+          context.fillStyle = isPremium
+            ? 'rgba(255,255,255,0.88)'
+            : style.color;
           context.textAlign = 'left';
           context.textBaseline = 'top';
 
@@ -664,8 +822,12 @@
         }
 
         // Stats si elles sont visibles.
-        const statsHidden = document.documentElement.classList.contains('wm-hide-card-stats');
+        const statsHidden =
+          document.documentElement.classList.contains('wm-hide-card-stats');
+
         if (!statsHidden) {
+          const attackIcon = card.querySelector('svg.lucide-swords');
+          const defenseIcon = card.querySelector('svg.lucide-shield');
           const attack = cardStat(card, 'svg.lucide-swords');
           const defense = cardStat(card, 'svg.lucide-shield');
 
@@ -679,7 +841,13 @@
               context.fillStyle = '#f87171';
               context.textAlign = 'left';
               context.fillText('ATK', 14, statsY);
-              context.fillStyle = '#ffffff';
+              context.fillStyle = isPremium
+                ? '#ffffff'
+                : getComputedStyle(
+                    attackIcon?.closest('div')?.querySelector('span') ||
+                    attackIcon?.closest('div') ||
+                    card
+                  ).color;
               context.fillText(attack, 38, statsY);
             }
 
@@ -688,7 +856,13 @@
               context.fillStyle = '#93c5fd';
               context.textAlign = 'right';
               context.fillText('DEF', width - valueWidth - 20, statsY);
-              context.fillStyle = '#ffffff';
+              context.fillStyle = isPremium
+                ? '#ffffff'
+                : getComputedStyle(
+                    defenseIcon?.closest('div')?.querySelector('span') ||
+                    defenseIcon?.closest('div') ||
+                    card
+                  ).color;
               context.fillText(defense, width - 14, statsY);
             }
 
@@ -696,16 +870,20 @@
           }
         }
 
-        // Bordure rareté.
         context.restore();
-        context.save();
-        roundedRectPath(context, 1, 1, width - 2, height - 2, radius - 1);
-        context.strokeStyle = accent;
-        context.lineWidth = 2;
-        context.shadowColor = accent + '66';
-        context.shadowBlur = 8;
-        context.stroke();
-        context.restore();
+
+        // Le full-art possède sa bordure métallique propre. En natif, le
+        // fond rarity asset est conservé tel quel, donc on n'ajoute rien.
+        if (isPremium) {
+          context.save();
+          roundedRectPath(context, 1, 1, width - 2, height - 2, radius - 1);
+          context.strokeStyle = accent;
+          context.lineWidth = 2;
+          context.shadowColor = accent + '66';
+          context.shadowBlur = 8;
+          context.stroke();
+          context.restore();
+        }
 
         return await canvasBlob(canvas);
       }
