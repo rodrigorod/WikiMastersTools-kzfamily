@@ -1187,7 +1187,7 @@ Cette action est irréversible.`;
 
           const desc = document.createElement('span');
           desc.className = 'wm-rarity-name';
-          desc.textContent = `${rarityNames[rarity] || rarity} (${currentRarityCounts[rarity] || 0})`;
+          desc.textContent = `${rarity} (${currentRarityCounts[rarity] || 0})`;
 
           chip.append(checkbox, badge, desc);
           rarityGrid.append(chip);
@@ -1209,7 +1209,7 @@ Cette action est irréversible.`;
             checkbox.checked = currentConfig.selectedRarities.has(r);
             chip.classList.toggle('is-selected', checkbox.checked);
             if (desc) {
-              desc.textContent = `${rarityNames[r] || r} (${currentRarityCounts[r] || 0})`;
+              desc.textContent = `${r} (${currentRarityCounts[r] || 0})`;
             }
           }
           checkRarityWarnings();
@@ -1840,8 +1840,14 @@ Cette action est irréversible.`;
         bulkDiscardBtn.addEventListener('click', async () => {
           bulkDiscardBtn.disabled = true;
           bulkDiscardBtn.textContent = 'Défausse en cours…';
+          const originalDiscardBtnText = discardButton ? discardButton.textContent : 'Défausse par prix';
           try {
-            const result = await executeDirectBulkDiscard(currentCandidates);
+            const result = await executeDirectBulkDiscard(currentCandidates, (progress, total) => {
+              bulkDiscardBtn.textContent = `Défausse... ${progress} / ${total}`;
+              if (discardButton) discardButton.textContent = `${progress} / ${total}`;
+            });
+            if (discardButton) discardButton.textContent = originalDiscardBtnText;
+            
             if (result && result.success) {
               const refreshed = getKnownCollectionCards();
               cards = refreshed.cards;
@@ -1861,6 +1867,7 @@ Cette action est irréversible.`;
             }
           } catch (e) {
             console.error('[WM Discard] Erreur lors de la défausse en masse', e);
+            if (discardButton) discardButton.textContent = originalDiscardBtnText;
             refreshPreview();
           }
         });

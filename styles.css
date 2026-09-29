@@ -3965,8 +3965,8 @@ body.wm-gif-filter-active main div[class*="glow-"]:not(.wm-card-is-gif) {
 }
 
 .wm-discard-safety-section {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 8px;
   margin-top: 4px;
 }
@@ -4015,6 +4015,8 @@ body.wm-gif-filter-active main div[class*="glow-"]:not(.wm-card-is-gif) {
 .wm-discard-preview-wrap {
   display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 200px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 12px;
   background: rgba(0, 0, 0, 0.2);
@@ -4022,7 +4024,7 @@ body.wm-gif-filter-active main div[class*="glow-"]:not(.wm-card-is-gif) {
 }
 
 .wm-discard-card-list {
-  max-height: 290px;
+  flex: 1 1 auto;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -4195,7 +4197,7 @@ body.wm-gif-filter-active main div[class*="glow-"]:not(.wm-card-is-gif) {
   position: fixed;
   bottom: 24px;
   right: 24px;
-  z-index: 99999;
+  z-index: 2147483647;
   padding: 12px 20px;
   border-radius: 10px;
   font-size: 13px;
