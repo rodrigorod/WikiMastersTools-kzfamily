@@ -3810,6 +3810,7 @@ body.wm-gif-filter-active main div[class*="glow-"]:not(.wm-card-is-gif) {
 .wm-discard-config-card {
   display: flex;
   flex-direction: column;
+  flex-shrink: 0;
   gap: 14px;
   padding: 16px 18px;
   background: rgba(255, 255, 255, 0.03);
@@ -3976,6 +3977,7 @@ body.wm-gif-filter-active main div[class*="glow-"]:not(.wm-card-is-gif) {
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
+  flex-shrink: 0;
   gap: 12px;
   padding: 11px 16px;
   background: rgba(244, 63, 94, 0.08);
@@ -4015,8 +4017,8 @@ body.wm-gif-filter-active main div[class*="glow-"]:not(.wm-card-is-gif) {
 .wm-discard-preview-wrap {
   display: flex;
   flex-direction: column;
-  flex: 1 1 auto;
-  min-height: 200px;
+  flex: 1 1 0;
+  min-height: 80px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 12px;
   background: rgba(0, 0, 0, 0.2);
@@ -4024,7 +4026,8 @@ body.wm-gif-filter-active main div[class*="glow-"]:not(.wm-card-is-gif) {
 }
 
 .wm-discard-card-list {
-  flex: 1 1 auto;
+  flex: 1 1 0;
+  min-height: 0;
   overflow-y: auto;
   display: flex;
   flex-direction: column;

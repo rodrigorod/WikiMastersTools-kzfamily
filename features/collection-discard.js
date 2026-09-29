@@ -1841,6 +1841,7 @@ Cette action est irréversible.`;
           bulkDiscardBtn.disabled = true;
           bulkDiscardBtn.textContent = 'Défausse en cours…';
           const originalDiscardBtnText = discardButton ? discardButton.textContent : 'Défausse par prix';
+          const targetTotalCount = currentCandidates.filter(c => c.isSelected).reduce((sum, c) => sum + c.discardCount, 0);
           try {
             const result = await executeDirectBulkDiscard(currentCandidates, (progress, total) => {
               bulkDiscardBtn.textContent = `Défausse... ${progress} / ${total}`;
@@ -1859,7 +1860,7 @@ Cette action est irréversible.`;
               buildTagChips?.();
               updateRarityChips();
               refreshPreview();
-              if (result.discardedCount >= totalDiscardCount) {
+              if (result.discardedCount >= targetTotalCount) {
                 close();
               }
             } else {
