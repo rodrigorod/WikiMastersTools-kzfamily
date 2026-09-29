@@ -1531,13 +1531,27 @@
         if (wishlistCardIds || isFetchingWishlist) return;
         isFetchingWishlist = true;
         try {
-          const res = await fetch('/api/cards?page=0&sort=rarity&wishlist=1');
-          if (res.ok) {
+          const ids = new Set();
+          let page = 0;
+          let hasMore = true;
+
+          while (hasMore) {
+            const res = await fetch(`/api/cards?page=${page}&sort=rarity&wishlist=1`);
+            if (!res.ok) break;
             const data = await res.json();
-            if (data && Array.isArray(data.wishlistCardIds)) {
-              wishlistCardIds = new Set(data.wishlistCardIds);
+            
+            if (data.wishlistCardIds && Array.isArray(data.wishlistCardIds)) {
+              data.wishlistCardIds.forEach(id => ids.add(id));
             }
+            if (data.cards && Array.isArray(data.cards)) {
+              data.cards.forEach(c => ids.add(c.id));
+            }
+
+            hasMore = data.searchHasMore === true;
+            page++;
+            if (page > 50) break; // sanity limit
           }
+          wishlistCardIds = ids;
         } catch (e) {
           console.error('[WM Average] Erreur lors de la récupération de la wishlist', e);
         } finally {
@@ -1550,13 +1564,20 @@
         const isMarketplace = runtime.core.isMarketplacePage();
         if (!isCollection && !isMarketplace) return;
 
-        const cards = document.querySelectorAll('[data-card-id]');
-        for (const card of cards) {
-          const id = card.getAttribute('data-card-id');
-          if (!id) continue;
+        const { normalizeTitle, idByTitle } = runtime.core;
+        
+        for (const h3 of document.querySelectorAll('h3')) {
+          const title = normalizeTitle(h3.textContent);
+          const id = idByTitle.get(title) || h3.closest('div[class*="rounded-2xl"]')?.dataset?.wmCardId;
+          const card = h3.closest('div[class*="rounded-2xl"][class*="overflow-hidden"][class*="cursor-pointer"]');
           
+          if (!card) continue;
+
           if (isWishlistFilterActive && wishlistCardIds) {
-            if (wishlistCardIds.has(id)) {
+            // If we don't know the ID yet, we might hide it by default or show it. 
+            // It's safer to hide it if we are sure it's not in the wishlist, 
+            // but if id is undefined (not loaded in idByTitle yet), it will be hidden.
+            if (id && wishlistCardIds.has(id)) {
               card.style.display = '';
             } else {
               card.style.display = 'none';
