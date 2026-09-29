@@ -25,6 +25,11 @@
             if (!response.ok) {
               const retryable = response.status >= 500 && response.status <= 599;
               lastError = new Error(`HTTP ${response.status}`);
+              lastError.status = response.status;
+              try {
+                const errJson = await response.json();
+                if (errJson) lastError.body = errJson;
+              } catch (_) {}
 
               if (!retryable || attempt >= 3) {
                 throw lastError;
@@ -72,6 +77,8 @@
             requestId,
             id,
             ok: false,
+            status: lastError?.status,
+            code: lastError?.body?.code,
             retryAfterMs: 60 * 1000,
             error: String(lastError?.message || lastError || 'Erreur réseau')
           }

@@ -17,6 +17,7 @@
       let activeRequests = 0;
       let bulkBatchActive = false;
       let bulkTotal = 0;
+      let globalPauseUntil = 0;
 
       function notifyBulkProgress() {
         runtime.collectionBulk?.updateBulkProgress(bulkTotal, bulkPendingIds.size);
@@ -78,6 +79,12 @@
       }
 
       function pumpQueue() {
+        if (Date.now() < globalPauseUntil) {
+          const delay = globalPauseUntil - Date.now();
+          setTimeout(pumpQueue, delay + 100);
+          return;
+        }
+
         while (activeRequests < MAX_CONCURRENT && queued.length > 0) {
           const id = queued.shift();
           queuedIds.delete(id);
@@ -138,7 +145,12 @@
         }
 
         if (!detail.ok) {
-          console.debug('[WM Average] échec temporaire mis en cache 60 s', id, detail.error);
+          if (detail.status === 403 || detail.code === 'automation_limit' || detail.status === 429) {
+            console.warn('[WM Average] Limite d\'automatisation atteinte, pause globale de 60s');
+            globalPauseUntil = Date.now() + (60 * 1000);
+          } else {
+            console.debug('[WM Average] échec temporaire mis en cache 60 s', id, detail.error);
+          }
         }
 
         pumpQueue();
