@@ -79,16 +79,18 @@
       }
 
       function ensureToolbar() {
-        if (!isCollectionPage() || document.getElementById('wm-tools-bar')) return;
+        const { isCollectionPage, isMarketplacePage } = runtime.core;
+        if ((!isCollectionPage() && !isMarketplacePage()) || document.getElementById('wm-tools-bar')) return;
 
         const bulkEnabled = runtime.settings.isEnabled('bulkPriceLoader');
         const rankingEnabled = runtime.settings.isEnabled('ranking');
         const compactEnabled = runtime.settings.isEnabled('compactMode');
         const gifEnabled = runtime.settings.isEnabled('gifCards');
 
-        if (!bulkEnabled && !rankingEnabled && !compactEnabled && !gifEnabled) return;
-
-        const h1 = [...document.querySelectorAll('h1')].find((el) => normalizeTitle(el.textContent) === 'Collection');
+        const h1 = [...document.querySelectorAll('h1')].find((el) => {
+          const txt = normalizeTitle(el.textContent).toLowerCase();
+          return txt === 'collection' || txt === 'marché' || txt === 'marketplace';
+        });
         if (!h1) return;
 
         const header = h1.parentElement;

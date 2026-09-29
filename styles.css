@@ -4395,3 +4395,9 @@ body.wm-gif-filter-active main div[class*="glow-"]:not(.wm-card-is-gif) {
   box-shadow: none;
   transform: none;
 }
+
+.wm-tool-button.wm-wishlist-filter-btn.is-active {
+  background: rgba(244, 63, 94, 0.15) !important;
+  border-color: rgba(244, 63, 94, 0.5) !important;
+  color: #fda4af !important;
+}

@@ -1523,11 +1523,100 @@
         }
       }
 
+      let isWishlistFilterActive = false;
+      let wishlistCardIds = null;
+      let isFetchingWishlist = false;
+
+      async function fetchWishlistIds() {
+        if (wishlistCardIds || isFetchingWishlist) return;
+        isFetchingWishlist = true;
+        try {
+          const res = await fetch('/api/cards?page=0&sort=rarity&wishlist=1');
+          if (res.ok) {
+            const data = await res.json();
+            if (data && Array.isArray(data.wishlistCardIds)) {
+              wishlistCardIds = new Set(data.wishlistCardIds);
+            }
+          }
+        } catch (e) {
+          console.error('[WM Average] Erreur lors de la récupération de la wishlist', e);
+        } finally {
+          isFetchingWishlist = false;
+        }
+      }
+
+      function applyWishlistFilter() {
+        const isCollection = runtime.core.isCollectionPage();
+        const isMarketplace = runtime.core.isMarketplacePage();
+        if (!isCollection && !isMarketplace) return;
+
+        const cards = document.querySelectorAll('[data-card-id]');
+        for (const card of cards) {
+          const id = card.getAttribute('data-card-id');
+          if (!id) continue;
+          
+          if (isWishlistFilterActive && wishlistCardIds) {
+            if (wishlistCardIds.has(id)) {
+              card.style.display = '';
+            } else {
+              card.style.display = 'none';
+            }
+          } else {
+            card.style.display = '';
+          }
+        }
+      }
+
+      function syncWishlistFilter() {
+        const isCollection = runtime.core.isCollectionPage();
+        const isMarketplace = runtime.core.isMarketplacePage();
+        if (!isCollection && !isMarketplace) {
+          isWishlistFilterActive = false;
+          return;
+        }
+
+        const bar = document.getElementById('wm-tools-bar');
+        if (!bar) return;
+
+        let btn = bar.querySelector('.wm-wishlist-filter-btn');
+        if (!btn) {
+          btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'wm-tool-button wm-wishlist-filter-btn';
+          btn.title = 'N\'afficher que les cartes de votre wishlist';
+          
+          btn.addEventListener('click', async () => {
+            isWishlistFilterActive = !isWishlistFilterActive;
+            btn.classList.toggle('is-active', isWishlistFilterActive);
+            
+            if (isWishlistFilterActive) {
+              if (!wishlistCardIds) {
+                btn.textContent = 'Chargement...';
+                await fetchWishlistIds();
+              }
+              btn.textContent = '♥ Wishlist';
+              applyWishlistFilter();
+            } else {
+              btn.textContent = '♡ Wishlist';
+              applyWishlistFilter();
+            }
+          });
+          
+          // Insert harmoniously in toolbar
+          bar.append(btn);
+        }
+
+        btn.textContent = isWishlistFilterActive ? (wishlistCardIds ? '♥ Wishlist' : 'Chargement...') : '♡ Wishlist';
+        btn.classList.toggle('is-active', isWishlistFilterActive);
+        applyWishlistFilter();
+      }
+
       function render() {
         syncHiddenStats();
         syncNotificationSound();
         syncCopyButtons();
         syncPullShareButton();
+        syncWishlistFilter();
       }
 
       return { render };

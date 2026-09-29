@@ -12,12 +12,14 @@
       function renderAll() {
         runtime.settings.ensureButton();
 
-        if (isCollectionPage()) {
+        if (isCollectionPage() || isMarketplacePage()) {
           runtime.collectionBulk.ensureToolbar();
-          runtime.collectionBulk.ensurePriceLegend();
-          runtime.gifFinder?.ensureToolbarButton();
-          runtime.gifFinder?.renderCardGifBadges();
-          runtime.collectionDiscard?.ensureToolbarButton();
+          if (isCollectionPage()) {
+            runtime.collectionBulk.ensurePriceLegend();
+            runtime.gifFinder?.ensureToolbarButton();
+            runtime.gifFinder?.renderCardGifBadges();
+            runtime.collectionDiscard?.ensureToolbarButton();
+          }
           runtime.priceUi.renderVisibleCollectionCards();
         }
 
