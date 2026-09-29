@@ -15,6 +15,9 @@
         if (isCollectionPage()) {
           runtime.collectionBulk.ensureToolbar();
           runtime.collectionBulk.ensurePriceLegend();
+          runtime.gifFinder?.ensureToolbarButton();
+          runtime.gifFinder?.renderCardGifBadges();
+          runtime.collectionDiscard?.ensureToolbarButton();
           runtime.priceUi.renderVisibleCollectionCards();
         }
 
@@ -101,7 +104,9 @@
             '.wm-pulls-tools, .wm-pulls-info, .wm-pack-recap, .wm-trade-values-panel, ' +
             '.wm-trade-values-controls, #wm-open-all-overlay, .wm-pull-stats, ' +
             '.wm-wikipedia-card-button, .wm-missing-image-credit, .wm-missing-title-art, .wm-compact-tools, .wm-price-legend, ' +
-            '.wm-auto-open-control, .wm-auto-open-help, .wm-settings-launch, .wm-settings-modal'
+            '.wm-auto-open-control, .wm-auto-open-help, .wm-settings-launch, .wm-settings-modal, ' +
+            '.wm-gif-button, .wm-gif-badge, .wm-gif-modal, .wm-gif-overlay, .wm-gif-filter-banner, ' +
+            '.wm-discard-button, .wm-discard-modal, .wm-discard-overlay, .wm-discard-toast'
           )
         );
       }

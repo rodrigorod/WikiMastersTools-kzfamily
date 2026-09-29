@@ -1,0 +1,18 @@
+{
+  "name": "wikimasters-tools-kzfamily",
+  "version": "4.16.0",
+  "description": "Outils WikiMasters configurables : prix moyens, collection, cartes GIF, échanges, paquets, cartes full-art, Wikipédia et vue compacte.",
+  "scripts": {
+    "test": "node --test test/**/*.test.js",
+    "test:watch": "node --test --watch test/**/*.test.js",
+    "lint": "npx web-ext lint --source-dir .",
+    "build": "npx web-ext build --overwrite-dest"
+  },
+  "keywords": [
+    "wikimasters",
+    "extension",
+    "browser-extension"
+  ],
+  "author": "kzfamily",
+  "license": "ISC"
+}

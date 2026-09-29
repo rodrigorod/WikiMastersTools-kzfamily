@@ -1,4 +1,29 @@
 (() => {
+  if (typeof window === 'undefined') {
+    global.window = global;
+    if (!global.window.addEventListener) global.window.addEventListener = () => {};
+    if (!global.window.removeEventListener) global.window.removeEventListener = () => {};
+    if (!global.window.dispatchEvent) global.window.dispatchEvent = () => true;
+    require('./features/core.js');
+    require('./features/price-ui.js');
+    require('./features/trades.js');
+    const core = global.__wmAverageFeatures?.core?.create();
+    const priceUi = global.__wmAverageFeatures?.priceUi?.create({ core, settings: { isEnabled: () => true } });
+    const trades = global.__wmAverageFeatures?.trades?.create({
+      ...core,
+      ...priceUi,
+      isFeatureEnabled: () => true
+    });
+    if (typeof module !== 'undefined' && module.exports) {
+      module.exports = {
+        ...core,
+        ...priceUi,
+        ...trades
+      };
+    }
+    return;
+  }
+
   if (window.__wmAverageUiInstalled) return;
   window.__wmAverageUiInstalled = true;
 
@@ -18,6 +43,8 @@
     'packs',
     'ranking',
     'collectionBulk',
+    'gifFinder',
+    'collectionDiscard',
     'app'
   ];
 
@@ -97,6 +124,8 @@
   runtime.packs = featureRegistry.packs.create(runtime);
   runtime.ranking = featureRegistry.ranking.create(runtime);
   runtime.collectionBulk = featureRegistry.collectionBulk.create(runtime);
+  runtime.gifFinder = featureRegistry.gifFinder.create(runtime);
+  runtime.collectionDiscard = featureRegistry.collectionDiscard.create(runtime);
   runtime.app = featureRegistry.app.create(runtime);
 
   runtime.app.startObserver();

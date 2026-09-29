@@ -1,5 +1,5 @@
 (() => {
-  const registry = window.__wmAverageFeatures ||= {};
+  const registry = (typeof window !== 'undefined' ? window : global).__wmAverageFeatures ||= {};
 
   registry.trades = {
     create(deps) {
@@ -406,7 +406,7 @@
           renderTradeButtons();
           renderTradeDetailCards();
         });
-      return { ensureTradesLoaded, renderTradeDetailCard, renderTradeDetailCards, renderTradeButtons, renderTradeValuesForCard, resetTradesRequest };
+      return { ensureTradesLoaded, renderTradeDetailCard, renderTradeDetailCards, renderTradeButtons, renderTradeValuesForCard, resetTradesRequest, tradeMatchScore };
     }
   };
 })();

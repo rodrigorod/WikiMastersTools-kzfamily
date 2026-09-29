@@ -1,13 +1,33 @@
 (() => {
-  const registry = window.__wmBridgeFeatures ||= {};
+  const registry = (typeof window !== 'undefined' ? window : global).__wmBridgeFeatures ||= {};
 
   registry.bridgeCore = {
     create() {
-      const originalFetch = window.fetch.bind(window);
+      const originalFetch = (typeof window !== 'undefined' && window.fetch)
+        ? window.fetch.bind(window)
+        : () => Promise.resolve({});
       const MAX_COLLECTION_PAGES = 200;
       const MAX_BULK_PACKS = 100;
       const RARITY_ORDER = ['L', 'UR', 'SR', 'R', 'PC', 'C'];
       const MARKETPLACE_MINE_CACHE_TTL = 15 * 1000;
+
+      function normalizeTags(raw) {
+        if (!raw) return [];
+        if (Array.isArray(raw)) {
+          return raw
+            .map((item) => {
+              if (!item) return '';
+              if (typeof item === 'string') return item.trim();
+              if (typeof item === 'object') return (item.name || item.label || item.title || item.tag || '').trim();
+              return String(item).trim();
+            })
+            .filter(Boolean);
+        }
+        if (typeof raw === 'string') {
+          return raw.split(',').map((s) => s.trim()).filter(Boolean);
+        }
+        return [];
+      }
 
       function mapEntry(entry) {
         const card = entry && entry.card;
@@ -16,15 +36,31 @@
         const title = card && card.wikipedia_title;
         if (!id || !title) return null;
 
+        const extraOwnedIds = Array.isArray(entry?.user_card_ids)
+          ? entry.user_card_ids
+          : Array.isArray(entry?.card_ids)
+            ? entry.card_ids
+            : Array.isArray(entry?.ids)
+              ? entry.ids
+              : [];
+        const ownedCardIds = [
+          ...(ownedCardId ? [ownedCardId] : []),
+          ...extraOwnedIds
+        ];
+
+        const rawTags = entry?.tags || entry?.labels || entry?.tag_names || card?.tags || card?.labels || [];
+        const tags = normalizeTags(rawTags);
+
         return {
           id,
           ownedCardId,
-          ownedCardIds: ownedCardId ? [ownedCardId] : [],
+          ownedCardIds: [...new Set(ownedCardIds)],
           title,
           rarity: card?.rarity || null,
           imageUrl: card?.image_url || null,
           wikipediaUrl: card?.wikipedia_url || null,
-          count: Number(entry?.count) || 1
+          count: Number(entry?.count) || 1,
+          tags
         };
       }
 
@@ -42,9 +78,13 @@
         }));
       }
 
+      function getOrigin() {
+        return (typeof location !== 'undefined' && location.origin) ? location.origin : 'https://www.wiki-masters.com';
+      }
+
       function isMarketplaceDetailApi(url) {
         try {
-          const parsed = new URL(url, location.origin);
+          const parsed = new URL(url, getOrigin());
           return /^\/api\/marketplace\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(parsed.pathname);
         } catch (_) {
           return false;
@@ -53,7 +93,7 @@
 
       function isPacksOpenApi(url) {
         try {
-          const parsed = new URL(url, location.origin);
+          const parsed = new URL(url, getOrigin());
           return parsed.pathname === '/api/packs/open';
         } catch (_) {
           return false;
@@ -62,7 +102,7 @@
 
       function isTradesApi(url) {
         try {
-          const parsed = new URL(url, location.origin);
+          const parsed = new URL(url, getOrigin());
           return parsed.pathname === '/api/trades';
         } catch (_) {
           return false;
@@ -71,7 +111,7 @@
 
       function getGlobalCollectionSummaryCardId(url) {
         try {
-          const parsed = new URL(url, location.origin);
+          const parsed = new URL(url, getOrigin());
           if (parsed.hostname !== 'cyrxjeppjqsxxjayfrur.supabase.co') return null;
           if (parsed.pathname !== '/rest/v1/cards') return null;
 
@@ -266,7 +306,7 @@
 
       return {
         originalFetch, MAX_COLLECTION_PAGES, MAX_BULK_PACKS, RARITY_ORDER,
-        MARKETPLACE_MINE_CACHE_TTL, mapEntry, extractCards, emitCollection,
+        MARKETPLACE_MINE_CACHE_TTL, normalizeTags, mapEntry, extractCards, emitCollection,
         isMarketplaceDetailApi, isPacksOpenApi, isTradesApi,
         getGlobalCollectionSummaryCardId, emitGlobalCollectionInspectedCard,
         mapPackCards, emitPackOpened, mapTrade, emitTrades, fetchTrades,

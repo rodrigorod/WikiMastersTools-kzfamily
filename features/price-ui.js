@@ -1,5 +1,5 @@
 (() => {
-  const registry = window.__wmAverageFeatures ||= {};
+  const registry = (typeof window !== 'undefined' ? window : global).__wmAverageFeatures ||= {};
 
   registry.priceUi = {
     create(runtime) {
@@ -27,6 +27,7 @@
       }
 
       function formatAverage(value) {
+        if (value == null || value === '') return '—';
         const n = Number(value);
         if (!Number.isFinite(n)) return '—';
         return new Intl.NumberFormat('fr-FR', {
@@ -342,6 +343,8 @@
         }
 
         runtime.trades?.renderTradeValuesForCard(id);
+        runtime.gifFinder?.onPriceUpdated?.(id);
+        runtime.collectionDiscard?.onPriceUpdated?.(id);
       }
 
       function getGlobalCollectionInspection() {

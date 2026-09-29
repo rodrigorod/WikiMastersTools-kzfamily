@@ -47,6 +47,8 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
       'features/packs.js',
       'features/ranking.js',
       'features/collection-bulk.js',
+      'features/gif-finder.js',
+      'features/collection-discard.js',
       'features/app.js',
       'content.js'
     ];

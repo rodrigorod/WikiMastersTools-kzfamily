@@ -1,4 +1,19 @@
 (() => {
+  if (typeof window === 'undefined') {
+    global.window = global;
+    require('./bridge/core.js');
+    require('./bridge/collection.js');
+    const core = global.__wmBridgeFeatures?.bridgeCore?.create();
+    const collection = global.__wmBridgeFeatures?.bridgeCollection?.create({ core });
+    if (typeof module !== 'undefined' && module.exports) {
+      module.exports = {
+        ...core,
+        ...collection
+      };
+    }
+    return;
+  }
+
   if (window.__wmAveragePriceBridgeInstalled) return;
   window.__wmAveragePriceBridgeInstalled = true;
 

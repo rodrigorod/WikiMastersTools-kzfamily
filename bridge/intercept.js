@@ -27,6 +27,17 @@
               response.clone().json().then(emitMarketplaceDetail).catch(() => {});
             } else if (url && isPacksOpenApi(url)) {
               response.clone().json().then(emitPackOpened).catch(() => {});
+            } else if (url && url.includes('/api/user-cards/bulk-discard')) {
+              if (response.ok) {
+                try {
+                  const init = args[1];
+                  const body = typeof init?.body === 'string' ? JSON.parse(init.body) : init?.body;
+                  const cardIds = Array.isArray(body?.card_ids) ? body.card_ids : [];
+                  window.dispatchEvent(new CustomEvent('wm-average-cards-discarded', {
+                    detail: { cardIds }
+                  }));
+                } catch (_) {}
+              }
             }
           } catch (_) {}
         }).catch(() => {

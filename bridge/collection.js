@@ -1,5 +1,5 @@
 (() => {
-  const registry = window.__wmBridgeFeatures ||= {};
+  const registry = (typeof window !== 'undefined' ? window : global).__wmBridgeFeatures ||= {};
 
   registry.bridgeCollection = {
     create(runtime) {
@@ -233,8 +233,17 @@
                 if (!existing.ownedCardId && existing.ownedCardIds.length) {
                   existing.ownedCardId = existing.ownedCardIds[0];
                 }
+
+                const mergedTags = new Set([
+                  ...(Array.isArray(existing.tags) ? existing.tags : []),
+                  ...(Array.isArray(card.tags) ? card.tags : [])
+                ]);
+                existing.tags = [...mergedTags];
               } else {
-                deduped.set(card.id, { ...card });
+                deduped.set(card.id, {
+                  ...card,
+                  tags: Array.isArray(card.tags) ? [...card.tags] : []
+                });
               }
             }
           }
@@ -271,7 +280,7 @@
       }
 
 
-      return { fetchAllCollection };
+      return { fetchAllCollection, extractRarityCounts };
     }
   };
 })();

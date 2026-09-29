@@ -84,8 +84,9 @@
         const bulkEnabled = runtime.settings.isEnabled('bulkPriceLoader');
         const rankingEnabled = runtime.settings.isEnabled('ranking');
         const compactEnabled = runtime.settings.isEnabled('compactMode');
+        const gifEnabled = runtime.settings.isEnabled('gifCards');
 
-        if (!bulkEnabled && !rankingEnabled && !compactEnabled) return;
+        if (!bulkEnabled && !rankingEnabled && !compactEnabled && !gifEnabled) return;
 
         const h1 = [...document.querySelectorAll('h1')].find((el) => normalizeTitle(el.textContent) === 'Collection');
         if (!h1) return;

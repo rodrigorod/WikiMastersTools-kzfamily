@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "WikiMasters - Prix moyen collection",
-  "version": "4.15.20",
-  "description": "Outils WikiMasters configurables : prix moyens, collection, échanges, paquets, cartes full-art, Wikipédia et vue compacte.",
+  "version": "4.16.0",
+  "description": "Outils WikiMasters configurables : prix moyens, défausse par prix, collection, cartes GIF, échanges, paquets, cartes full-art, Wikipédia et vue compacte.",
   "host_permissions": [
     "https://www.wiki-masters.com/*"
   ],
@@ -53,6 +53,8 @@
         "features/packs.js",
         "features/ranking.js",
         "features/collection-bulk.js",
+        "features/gif-finder.js",
+        "features/collection-discard.js",
         "features/app.js",
         "content.js"
       ],

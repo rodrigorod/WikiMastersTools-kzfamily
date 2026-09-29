@@ -17,6 +17,8 @@
         ranking: true,
         rankingSales: true,
         compactMode: true,
+        gifCards: true,
+        discardByPrice: true,
         packRecap: true,
         pullStats: true,
         openAll: true,
@@ -44,7 +46,9 @@
             ['bulkPriceLoader', 'Chargement massif des prix', 'Ajoute « Charger les prix » avec sélection des raretés.'],
             ['ranking', 'Classement « Plus chères »', 'Ajoute le classement des cartes connues par prix moyen.'],
             ['rankingSales', 'Mise en vente depuis le classement', 'Affiche les contrôles pour mettre directement une carte en vente depuis le classement.'],
-            ['compactMode', 'Mode compact', 'Ajoute le bouton Compact dans les vues collection.']
+            ['compactMode', 'Mode compact', 'Ajoute le bouton Compact dans les vues collection.'],
+            ['gifCards', 'Recherche de cartes GIF', 'Ajoute un bouton dans la collection pour trouver et afficher toutes les cartes avec une image GIF.'],
+            ['discardByPrice', 'Défausse par prix moyen', 'Ajoute un bouton dans la collection pour défausser en masse les cartes sous un seuil de prix en WB selon la rareté.']
           ]
         },
         {

@@ -1,5 +1,5 @@
 (() => {
-  const registry = window.__wmAverageFeatures ||= {};
+  const registry = (typeof window !== 'undefined' ? window : global).__wmAverageFeatures ||= {};
 
   registry.core = {
     create() {
@@ -30,32 +30,32 @@
       const idByTitle = new Map();
       const cacheMemory = new Map();
 
-      function isCollectionPage() {
-        return location.pathname === '/collection' || location.pathname.startsWith('/collection/');
+      function isCollectionPage(path = (typeof location !== 'undefined' ? location.pathname : '')) {
+        return path === '/collection' || path.startsWith('/collection/');
       }
 
-      function isMarketplaceDetailPage() {
-        return /^\/marketplace\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/?$/i.test(location.pathname);
+      function isMarketplaceDetailPage(path = (typeof location !== 'undefined' ? location.pathname : '')) {
+        return /^\/marketplace\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/?$/i.test(path);
       }
 
-      function isMarketplacePage() {
-        return location.pathname === '/marketplace' || location.pathname.startsWith('/marketplace/');
+      function isMarketplacePage(path = (typeof location !== 'undefined' ? location.pathname : '')) {
+        return path === '/marketplace' || path.startsWith('/marketplace/');
       }
 
-      function isPullsPage() {
-        return location.pathname === '/pulls' || location.pathname.startsWith('/pulls/');
+      function isPullsPage(path = (typeof location !== 'undefined' ? location.pathname : '')) {
+        return path === '/pulls' || path.startsWith('/pulls/');
       }
 
-      function isTradesPage() {
-        return location.pathname === '/trades' || location.pathname.startsWith('/trades/');
+      function isTradesPage(path = (typeof location !== 'undefined' ? location.pathname : '')) {
+        return path === '/trades' || path.startsWith('/trades/');
       }
 
-      function isGlobalCollectionPage() {
-        return location.pathname === '/global-collection' || location.pathname.startsWith('/global-collection/');
+      function isGlobalCollectionPage(path = (typeof location !== 'undefined' ? location.pathname : '')) {
+        return path === '/global-collection' || path.startsWith('/global-collection/');
       }
 
-      function isGuildPage() {
-        return location.pathname === '/guild' || location.pathname.startsWith('/guild/');
+      function isGuildPage(path = (typeof location !== 'undefined' ? location.pathname : '')) {
+        return path === '/guild' || path.startsWith('/guild/');
       }
 
       function isLastPullCardVisible() {

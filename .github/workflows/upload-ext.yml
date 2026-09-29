@@ -1,0 +1,51 @@
+name: Deploy Extension to Chrome & Firefox
+
+on:
+  push:
+    tags:
+      - 'v*' # Se déclenche sur les tags comme v1.0.0, v1.1.4, etc.
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install & Build Extension
+        run: |
+          npm ci
+          npm run build # Génère vos fichiers compilés, par exemple dans ./dist
+
+      # ----------------------------------------------------
+      # ÉTAPE CHROME WEB STORE
+      # ----------------------------------------------------
+      - name: Zip Extension for Chrome
+        run: cd dist && zip -r ../extension-chrome.zip . *
+
+      - name: Upload to Chrome Web Store
+        uses: mryechao/chrome-webstore-upload@v2
+        with:
+          file-path: 'extension-chrome.zip'
+          extension-id: ${{ secrets.CHROME_EXTENSION_ID }}
+          client-id: ${{ secrets.CHROME_CLIENT_ID }}
+          client-secret: ${{ secrets.CHROME_CLIENT_SECRET }}
+          refresh-token: ${{ secrets.CHROME_REFRESH_TOKEN }}
+          publish: true
+
+      # ----------------------------------------------------
+      # ÉTAPE FIREFOX ADD-ONS (Sign & Publish)
+      # ----------------------------------------------------
+      - name: Sign & Publish to Firefox Add-ons
+        run: |
+          npx web-ext sign \
+            --source-dir ./dist \
+            --api-key ${{ secrets.MOZILLA_JWT_ISSUER }} \
+            --api-secret ${{ secrets.MOZILLA_JWT_SECRET }} \
+            --channel listed
